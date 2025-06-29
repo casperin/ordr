@@ -11,9 +11,9 @@ path = "ordr_macros.rs"
 workspace = true
 
 [dependencies]
+ordr_core = { path = "../ordr_core" }
 quote = "1.0.40"
 syn = { version = "2.0.101", features = ["full"] }
-ordr_core = { path = "../ordr_core" }
 
 [dev-dependencies]
 proc-macro2 = "1.0.95"

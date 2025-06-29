@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/casperin/ordr"
+description = "Executes and keeps track of a set of interdependent functions"
 
 [lib]
 path = "ordr.rs"

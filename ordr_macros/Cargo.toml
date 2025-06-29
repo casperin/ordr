@@ -14,7 +14,7 @@ path = "ordr_macros.rs"
 workspace = true
 
 [dependencies]
-ordr_core = { path = "../ordr_core" }
+ordr_core = "0.1.0"
 quote = "1.0.40"
 syn = { version = "2.0.101", features = ["full"] }
 

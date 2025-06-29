@@ -1,0 +1,17 @@
+[package]
+name = "ordr_core"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "ordr_core.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+paste = "1.0.15"
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1.44.2", features = ["macros", "sync", "rt", "time"] }
+tokio-util = "0.7.15"
+tracing = "0.1.41"

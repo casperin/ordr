@@ -1,0 +1,6 @@
+[workspace]
+resolver = "3"
+members = ["ordr", "ordr_core", "ordr_macros"]
+
+[workspace.lints.clippy]
+pedantic = "warn"

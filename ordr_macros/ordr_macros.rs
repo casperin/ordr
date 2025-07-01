@@ -131,8 +131,6 @@ fn ty_to_string(ty: &Type) -> String {
 ///     }
 /// }
 ///
-/// impl std::error::Error for Error {}
-///
 /// // A context so we can control the output of `create_bar`.
 /// #[derive(Clone)]
 /// struct Ctx {
@@ -242,7 +240,7 @@ pub fn output(input: TokenStream) -> TokenStream {
             pub fn into_job<C, E>(self) -> ordr::job::Job<C, E>
             where
                 C: Clone + Send + 'static,
-                E: Clone + Send + 'static + std::error::Error
+                E: Send + 'static + std::fmt::Display
             {
                 let mut job = ordr::job::Job::new();
                 #(

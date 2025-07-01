@@ -27,8 +27,6 @@ impl std::fmt::Display for Error {
     }
 }
 
-impl std::error::Error for Error {}
-
 #[executor]
 async fn trees(ctx: Ctx) -> Result<Trees, Error> {
     match ctx.trees {

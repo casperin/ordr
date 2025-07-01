@@ -1,4 +1,4 @@
-use ordr::{build_graph, executor, job::Job};
+use ordr::{build, executor, job::Job};
 
 use rand::Rng;
 use tokio::{sync::Mutex, time::sleep};
@@ -105,7 +105,7 @@ node!(structed_data: StructuredData, DocStructureUploaded, DocPageImagesUploaded
 async fn main() {
     tracing_subscriber::fmt().init();
 
-    let graph = build_graph!(
+    let graph = build!(
         S3PrefixStored,
         OriginalFilePath,
         FileMeta,

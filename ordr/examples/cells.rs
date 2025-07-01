@@ -1,10 +1,10 @@
-use ordr::{build_graph, job::Job};
+use ordr::{build, job::Job};
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt().init();
 
-    let graph = build_graph!(
+    let graph = build!(
         cells::CellularComponent,
         cells::Cell,
         cells::CellPart,
@@ -50,8 +50,8 @@ async fn main() {
 mod cells {
     use std::{convert::Infallible, sync::Arc, time::Duration};
 
-    use rand::Rng;
     use ordr::executor;
+    use rand::Rng;
     use tokio::{sync::Mutex, time::sleep};
 
     #[derive(Clone)]

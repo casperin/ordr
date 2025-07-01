@@ -1,4 +1,4 @@
-use ordr::{build_graph, executor, job::Job};
+use ordr::{build, executor, job::Job};
 
 use std::convert::Infallible;
 
@@ -36,7 +36,7 @@ async fn mux(_ctx: Ctx, audio: Audio, video: Video) -> Result<Mux, Infallible> {
 
 #[tokio::main]
 async fn main() {
-    let graph = build_graph!(Raw, Audio, Video, Mux).unwrap();
+    let graph = build!(Raw, Audio, Video, Mux).unwrap();
     let job = Job::new().with_target::<Mux>();
 
     let out = graph.execute(job, Ctx).await.unwrap();

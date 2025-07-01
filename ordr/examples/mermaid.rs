@@ -2,7 +2,7 @@
 
 use std::convert::Infallible;
 
-use ordr::{build_graph, executor, job::Job};
+use ordr::{build, executor, job::Job};
 
 #[derive(Debug, Clone)]
 struct Trees(usize);
@@ -61,7 +61,7 @@ async fn play(_: (), _friends: Friends, _ideas: Ideas) -> Result<HaveFun, Infall
 }
 
 fn main() {
-    let graph = build_graph!(Trees, Friends, Money, Paper, Ideas, GetRich, HaveFun).unwrap();
+    let graph = build!(Trees, Friends, Money, Paper, Ideas, GetRich, HaveFun).unwrap();
 
     let job = Job::new()
         .with_input(Friends(vec!["Paul", "Sarah", "Ida"]))

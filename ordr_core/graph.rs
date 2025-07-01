@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+};
 
 use tokio::{select, task::JoinSet};
 use tracing::info;
@@ -17,8 +20,8 @@ pub trait Ctx: Clone + Send + 'static {}
 impl<T> Ctx for T where T: Clone + Send + 'static {}
 
 /// Error type for nodes. All nodes in a graph must return the same error type.
-pub trait Er: Clone + Send + 'static + std::error::Error {}
-impl<T> Er for T where T: Clone + Send + 'static + std::error::Error {}
+pub trait Er: Send + 'static + Display {}
+impl<T> Er for T where T: Send + 'static + Display {}
 
 /// Creates a graph from a static set of Nodes.
 ///
@@ -33,7 +36,7 @@ impl<T> Er for T where T: Clone + Send + 'static + std::error::Error {}
 /// let graph = create_graph!(A, B).unwrap();
 /// ```
 #[macro_export]
-macro_rules! build_graph {
+macro_rules! build {
     ( $( $ty:ty ),* $(,)? ) => {{
         let mut graph = $crate::graph::Graph::builder();
         $(
@@ -150,11 +153,11 @@ impl<C: Ctx, E: Er> Graph<C, E> {
             // Start the ready nodes.
             for i in ready {
                 info!(node = self.node_name(i), "Node start");
-                let node = self.nodes[i].clone();
                 let payloads = self.adj[i].iter().map(|i| &results[i]).collect();
-                let payload = (node.prepare)(payloads);
+                let payload = (self.nodes[i].prepare)(payloads);
+                let execute = (self.nodes[i].execute).clone();
                 let ctx = ctx.clone();
-                handles.spawn(async move { (i, (node.execute)(ctx, payload).await) });
+                handles.spawn(async move { (i, execute(ctx, payload).await) });
             }
 
             select! {
@@ -165,7 +168,7 @@ impl<C: Ctx, E: Er> Graph<C, E> {
                             results.insert(i, r);
                         }
                         Some(Ok((i, Err(error)))) => {
-                            info!(node = self.node_name(i), ?error, "Node failed");
+                            info!(node = self.node_name(i), error = error.to_string(), "Node failed");
                             let outputs = self.outputs(results);
                             return Err(Error::NodeFailed { outputs, i, error });
                         }

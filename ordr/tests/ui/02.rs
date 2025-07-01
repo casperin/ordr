@@ -1,4 +1,4 @@
-use ordr::{build_graph, executor, job::Job};
+use ordr::{build, executor, job::Job};
 
 use std::convert::Infallible;
 
@@ -40,7 +40,7 @@ mod foo {
 
 #[tokio::main]
 pub async fn main() {
-    let graph = build_graph!(Raw, Audio, foo::Video, Mux).unwrap();
+    let graph = build!(Raw, Audio, foo::Video, Mux).unwrap();
 
     // Add stuff we actually already have
     let job = Job::new()

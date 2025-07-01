@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 
-use ordr::{build_graph, executor, job::Job};
+use ordr::{build, executor, job::Job};
 
 #[derive(Clone)]
 struct Ctx;
@@ -24,7 +24,7 @@ async fn make_b(_ctx: Ctx, A(a): A) -> Result<B, Infallible> {
 
 #[tokio::main]
 async fn main() {
-    let graph = build_graph!(A, B).unwrap();
+    let graph = build!(A, B).unwrap();
 
     // Create a job, where we provide an `A`.
     // This means that `make_a` will never run.

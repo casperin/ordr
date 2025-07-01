@@ -1,4 +1,4 @@
-use ordr::{build_graph, error, executor, job::Job};
+use ordr::{build, error, executor, job::Job};
 
 #[derive(Clone, Debug)]
 struct Error(&'static str);
@@ -43,7 +43,7 @@ async fn make_c(_ctx: Ctx, _b: B) -> Result<C, Error> {
 async fn main() {
     // tracing_subscriber::fmt().init();
 
-    let graph = build_graph!(A, B, C).unwrap();
+    let graph = build!(A, B, C).unwrap();
 
     let job = Job::new().with_target::<C>();
 

@@ -4,14 +4,13 @@ use std::{
     sync::Arc,
 };
 
-/// Bytes that can be stored in a generic manner, and transferred across threads.
+/// Arbitrary sendable object that lives on the heap and can be sent.
 pub(crate) type Payload = Box<dyn Any + Send>;
 
 /// Output of the execute function on a [`Node`].
 type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// Struct describing everything needed to find dependencies and execute this node.
-#[derive(Clone)]
 #[allow(clippy::type_complexity)]
 pub struct Node<C, E> {
     /// Name of this node. Only used for display.

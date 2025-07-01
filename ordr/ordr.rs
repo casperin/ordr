@@ -63,7 +63,7 @@
 //! ```ignore
 //! // Checks for cycles, etc. You can reuse the graph (although it's not terribly
 //! // expensive to make one).
-//! let graph = build_graph!(A, B).unwrap();
+//! let graph = build!(A, B).unwrap();
 //!
 //! // Then we need a job. A job describes the targets we are interested in. You
 //! // can add as many targets as you like.
@@ -123,7 +123,7 @@
 //! execute a job. You can get a graph like this:
 //!
 //! ```ignore
-//! let graph = build_graph!(A, B);
+//! let graph = build!(A, B);
 //! let job = Job::new().with_target::<B>();
 //! let mermaid = graph.mermaid(&job);
 //! println!("{mermaid}");
@@ -168,5 +168,5 @@
 //! cancellation_token.cancel();
 //! ```
 
-pub use ordr_core::{build_graph, error, graph, job, node, outputs};
+pub use ordr_core::{build, error, graph, job, node, outputs};
 pub use ordr_macros::{Output, executor};

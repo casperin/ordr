@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 
-use ordr::{build_graph, error::Error, executor, job::Job};
+use ordr::{build, error::Error, executor, job::Job};
 
 #[derive(Clone)]
 struct Ctx;
@@ -25,7 +25,7 @@ async fn make_b(_ctx: Ctx, A(a): A) -> Result<B, Infallible> {
 
 #[tokio::main]
 async fn main() {
-    let graph = build_graph!(A, B).unwrap();
+    let graph = build!(A, B).unwrap();
 
     let job = Job::new().with_target::<B>();
     let token = job.cancellation_token();

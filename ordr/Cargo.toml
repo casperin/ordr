@@ -10,8 +10,10 @@ description = "Executes and keeps track of a set of interdependent functions"
 path = "ordr.rs"
 
 [dependencies]
-ordr_core = "0.1.0"
-ordr_macros = "0.1.0"
+# ordr_core = "0.1.0"
+# ordr_macros = "0.1.0"
+ordr_core = { path = "../ordr_core" }
+ordr_macros = { path = "../ordr_macros" }
 
 [dev-dependencies]
 futures = "0.3.31"
@@ -21,3 +23,5 @@ tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
 trybuild = "1.0.104"
 serde = { version = "1.0.219", features = ["derive"] }
+anyhow = "1.0.98"
+thiserror = "2.0.12"

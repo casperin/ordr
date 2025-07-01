@@ -57,5 +57,3 @@ impl<E: Er> std::fmt::Display for Error<E> {
         }
     }
 }
-
-impl<E: Er> std::error::Error for Error<E> {}

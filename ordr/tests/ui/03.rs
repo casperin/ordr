@@ -1,7 +1,7 @@
 use std::hint::black_box;
 use std::time::Duration;
 
-use ordr::{Output, build_graph, error, executor, job::Job};
+use ordr::{Output, build, error, executor, job::Job};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Trees(usize);
@@ -122,7 +122,7 @@ async fn main() {
 }
 
 async fn basic_flow() {
-    let graph = build_graph!(Trees, Friends, Money, Paper, Ideas, GetRich, HaveFun).unwrap();
+    let graph = build!(Trees, Friends, Money, Paper, Ideas, GetRich, HaveFun).unwrap();
 
     let job = Job::new().with_target::<GetRich>().with_target::<HaveFun>();
 
@@ -141,7 +141,7 @@ async fn basic_flow() {
 }
 
 async fn partial() {
-    let graph = build_graph!(Trees, Friends, Money, Paper, Ideas, GetRich, HaveFun).unwrap();
+    let graph = build!(Trees, Friends, Money, Paper, Ideas, GetRich, HaveFun).unwrap();
 
     let job = Job::new()
         .with_input(Ideas(&["ida"]))
@@ -162,7 +162,7 @@ async fn partial() {
 }
 
 async fn timing_out() {
-    let graph = build_graph!(Trees, Friends, Money, Paper, Ideas, GetRich, HaveFun).unwrap();
+    let graph = build!(Trees, Friends, Money, Paper, Ideas, GetRich, HaveFun).unwrap();
     let job = Job::new().with_target::<GetRich>().with_target::<HaveFun>();
 
     let ctx = Ctx {
@@ -221,7 +221,7 @@ async fn timing_out() {
 }
 
 async fn abort() {
-    let graph = build_graph!(Trees, Friends, Money, Paper, Ideas, GetRich, HaveFun).unwrap();
+    let graph = build!(Trees, Friends, Money, Paper, Ideas, GetRich, HaveFun).unwrap();
 
     let job = Job::new().with_target::<GetRich>().with_target::<HaveFun>();
 

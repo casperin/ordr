@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 
-use ordr::{build_graph, executor, job::Job};
+use ordr::{build, executor, job::Job};
 
 /// Basic Ctx for the nodes. You can put anything in it, as long as it implements `Clone`.
 #[derive(Clone)]
@@ -47,7 +47,7 @@ async fn main() {
     // tracing_subscriber::fmt().init();
 
     // Create a graph. It is diamond shaped.
-    let graph = build_graph!(A, B, C, D).unwrap();
+    let graph = build!(A, B, C, D).unwrap();
 
     // Create a job, that has the D as the target
     let job = Job::new().with_target::<D>();

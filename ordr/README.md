@@ -73,7 +73,7 @@ Before we start executing anything, we need to make a graph:
 ```rs
 // Checks for cycles, etc. You can reuse the graph (although it's not terribly
 // expensive to make one).
-let graph = build_graph!(A, B).unwrap();
+let graph = build!(A, B).unwrap();
 
 // Then we need a job. A job describes the targets we are interested in. You
 // can add as many targets as you like.
@@ -133,7 +133,7 @@ It might be useful to inspect the graph and how ordr is expecting to
 execute a job. You can get a graph like this:
 
 ```rs
-let graph = build_graph!(A, B);
+let graph = build!(A, B);
 let job = Job::new().with_target::<B>();
 let mermaid = graph.mermaid(&job);
 println!("{mermaid}");

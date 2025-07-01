@@ -1,6 +1,6 @@
 use std::{convert::Infallible, time::Duration};
 
-use ordr::{build_graph, executor, job::Job};
+use ordr::{build, executor, job::Job};
 
 #[derive(Debug, Clone)]
 struct A;
@@ -72,7 +72,7 @@ async fn wait(node: &'static str, color: &'static str, timeout: u64) {
 
 #[tokio::main]
 async fn main() {
-    let graph = build_graph!(A, B, C, D, E).unwrap();
+    let graph = build!(A, B, C, D, E).unwrap();
     let job = Job::new().with_target::<E>();
     println!("{}", graph.mermaid(&job));
     graph.execute(job, ()).await.unwrap();

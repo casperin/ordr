@@ -1,10 +1,5 @@
 use ordr::{build, job::Job, producer};
 
-use rand::Rng;
-use tokio::{sync::Mutex, time::sleep};
-
-use std::{sync::Arc, time::Duration};
-
 macro_rules! node {
     // No deps
     ( $name:ident: $ty:ident ) => {
@@ -12,8 +7,8 @@ macro_rules! node {
         struct $ty;
 
         #[producer]
-        async fn $name(ctx: Ctx) -> Result<$ty, std::convert::Infallible> {
-            ctx.wait().await;
+        async fn $name(_ctx: ()) -> Result<$ty, std::convert::Infallible> {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
             Ok($ty)
         }
     };
@@ -23,48 +18,11 @@ macro_rules! node {
         struct $ty;
 
         #[producer]
-        async fn $name(ctx: Ctx, $( _: $dep ),* ) -> Result<$ty, std::convert::Infallible> {
-            ctx.wait().await;
+        async fn $name(_ctx: (), $( _: $dep ),* ) -> Result<$ty, std::convert::Infallible> {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
             Ok($ty)
         }
     };
-}
-
-#[derive(Clone)]
-pub struct Ctx {
-    index: Arc<Mutex<usize>>,
-    nums: Vec<u64>,
-}
-
-impl Ctx {
-    pub fn new() -> Self {
-        Ctx::default()
-    }
-
-    async fn wait(&self) {
-        let mut lock = self.index.lock().await;
-        let index = *lock;
-        *lock += 1;
-        drop(lock);
-        sleep(Duration::from_millis(self.nums[index])).await;
-    }
-}
-
-impl Default for Ctx {
-    fn default() -> Self {
-        let mut rng = rand::rng();
-        let mut nums = Vec::with_capacity(100);
-
-        for _ in 0..100 {
-            let num = rng.random_range(0..2000);
-            nums.push(num);
-        }
-
-        Self {
-            index: Arc::new(Mutex::new(0)),
-            nums,
-        }
-    }
 }
 
 node!(s3_prefix_stored: S3PrefixStored);
@@ -101,9 +59,9 @@ node!(spam_notified: SpamNotified, DocMeta);
 node!(categories_detected: CategoriesDetected, DocText);
 node!(structed_data: StructuredData, DocStructureUploaded, DocPageImagesUploaded);
 
-#[tokio::main]
-async fn main() {
-    tracing_subscriber::fmt().init();
+#[tokio::test]
+async fn doc_example() {
+    // tracing_subscriber::fmt().init();
 
     let graph = build!(
         S3PrefixStored,
@@ -158,9 +116,8 @@ async fn main() {
         .with_target::<TmpFileCopied>()
         .with_target::<SpamNotified>();
 
-    let diagram = graph.mermaid(&job);
-    println!("{diagram}");
+    // let diagram = graph.mermaid(&job);
+    // println!("{diagram}");
 
-    let ctx = Ctx::new();
-    graph.execute(job, ctx).await.unwrap();
+    graph.execute(job, ()).await.unwrap();
 }

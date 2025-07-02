@@ -4,7 +4,7 @@ use std::{
 };
 
 use tokio::{select, task::JoinSet};
-use tracing::info;
+use tracing::{error, info};
 
 use crate::{
     error::Error,
@@ -152,11 +152,12 @@ impl<C: Ctx, E: Er> Graph<C, E> {
 
             // Start the ready nodes.
             for i in ready {
-                info!(node = self.node_name(i), "Node start");
+                let node = &self.nodes[i];
                 let payloads = self.adj[i].iter().map(|i| &results[i]).collect();
-                let payload = (self.nodes[i].prepare)(payloads);
-                let execute = (self.nodes[i].execute).clone();
+                let payload = (node.prepare)(payloads);
+                let execute = (node.execute).clone();
                 let ctx = ctx.clone();
+                info!(node = node.name, "Node start");
                 handles.spawn(async move { (i, execute(ctx, payload).await) });
             }
 
@@ -168,12 +169,12 @@ impl<C: Ctx, E: Er> Graph<C, E> {
                             results.insert(i, r);
                         }
                         Some(Ok((i, Err(error)))) => {
-                            info!(node = self.node_name(i), error = error.to_string(), "Node failed");
+                            error!(node = self.node_name(i), error = error.to_string(), "Node failed");
                             let outputs = self.outputs(results);
                             return Err(Error::NodeFailed { outputs, i, error });
                         }
                         Some(Err(error)) => {
-                            info!(?error, "Node panicked");
+                            error!(?error, "Node panicked");
                             let outputs = self.outputs(results);
                             return Err(Error::NodePanic { outputs, error });
                         }

@@ -18,7 +18,7 @@ impl Display for E {
 macro_rules! node {
     ($name:ident: $ty:ident, $ret:expr) => {
         #[derive(Clone, Debug, PartialEq, Eq)]
-        struct $ty;
+        pub(crate) struct $ty;
 
         #[executor]
         async fn $name(_ctx: Ctx) -> Result<$ty, E> {
@@ -28,7 +28,7 @@ macro_rules! node {
 
     ($name:ident: $ty:ident, $ret:expr, $($dep:ident),*) => {
         #[derive(Clone, Debug, PartialEq, Eq)]
-        struct $ty;
+        pub(crate) struct $ty;
 
         #[executor]
         async fn $name(_ctx: Ctx, $( _: $dep ),*) -> Result<$ty, E> {
@@ -380,5 +380,25 @@ mod concurrent {
         let events = ctx.events.lock().await;
         let events_expected = vec!["start", "start", "end", "end"];
         assert_eq!(*events, events_expected);
+    }
+}
+
+mod split_mods {
+    use super::*;
+
+    mod x {
+        use super::*;
+        node!(a: A, Ok(A));
+    }
+
+    mod y {
+        use super::*;
+        use x::A;
+        node!(b: B, Ok(B), A);
+    }
+
+    #[test]
+    fn from_different_mods() {
+        build!(x::A, y::B).unwrap();
     }
 }

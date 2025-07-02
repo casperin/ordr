@@ -22,10 +22,19 @@ pub struct Node<C, E> {
     /// List of dependencies.
     pub deps: Vec<TypeId>,
 
-    #[doc(hidden)]
+    /// This takes a list of borrowed payloads. The length of the vec is the
+    /// same as the number of parameters (minus `Ctx`).
+    ///
+    /// Essentially it just clones the payload (and concats them to a single
+    /// Payload). It's needed, because you can't clone Payloads without knowing
+    /// what they are (need to downcast first).
     pub prepare: Arc<dyn Fn(Vec<&Payload>) -> Payload + Send + Sync + 'static>,
 
-    #[doc(hidden)]
+    /// Takes the output from [`Self::prepare`] (and `Ctx`) and actually
+    /// executes the node, to produce an output.
+    ///
+    /// This clossure should only downcast its input, then call the provided
+    /// executor.
     pub execute:
         Arc<dyn Fn(C, Payload) -> BoxFuture<'static, Result<Payload, E>> + Send + Sync + 'static>,
 }

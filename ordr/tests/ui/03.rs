@@ -1,7 +1,7 @@
 use std::hint::black_box;
 use std::time::Duration;
 
-use ordr::{Output, build, error, executor, job::Job};
+use ordr::{Output, build, error, producer, job::Job};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Trees(usize);
@@ -27,7 +27,7 @@ impl std::fmt::Display for Error {
     }
 }
 
-#[executor]
+#[producer]
 async fn trees(ctx: Ctx) -> Result<Trees, Error> {
     match ctx.trees {
         Some(v) => Ok(Trees(v)),
@@ -35,7 +35,7 @@ async fn trees(ctx: Ctx) -> Result<Trees, Error> {
     }
 }
 
-#[executor]
+#[producer]
 async fn friends(ctx: Ctx) -> Result<Friends, Error> {
     match ctx.friends {
         Some(v) => Ok(Friends(v)),
@@ -43,7 +43,7 @@ async fn friends(ctx: Ctx) -> Result<Friends, Error> {
     }
 }
 
-#[executor]
+#[producer]
 async fn money(ctx: Ctx) -> Result<Money, Error> {
     match ctx.money {
         Some(v) => Ok(Money(v)),
@@ -51,7 +51,7 @@ async fn money(ctx: Ctx) -> Result<Money, Error> {
     }
 }
 
-#[executor]
+#[producer]
 async fn paper(ctx: Ctx, trees: Trees, friends: Friends) -> Result<Paper, Error> {
     black_box((trees, friends));
     let d = Duration::from_millis(ctx.chop);
@@ -59,7 +59,7 @@ async fn paper(ctx: Ctx, trees: Trees, friends: Friends) -> Result<Paper, Error>
     Ok(Paper(10000))
 }
 
-#[executor]
+#[producer]
 async fn ideas(ctx: Ctx, money: Money) -> Result<Ideas, Error> {
     black_box(money);
     let d = Duration::from_millis(ctx.travel);
@@ -73,7 +73,7 @@ async fn ideas(ctx: Ctx, money: Money) -> Result<Ideas, Error> {
     }
 }
 
-#[executor]
+#[producer]
 async fn get_rich(ctx: Ctx, paper: Paper, ideas: Ideas) -> Result<GetRich, Error> {
     black_box((paper, ideas));
     let d = Duration::from_millis(ctx.write);
@@ -81,7 +81,7 @@ async fn get_rich(ctx: Ctx, paper: Paper, ideas: Ideas) -> Result<GetRich, Error
     Ok(GetRich(100))
 }
 
-#[executor]
+#[producer]
 async fn have_fun(ctx: Ctx, friends: Friends, ideas: Ideas) -> Result<HaveFun, Error> {
     black_box((friends, ideas));
     let d = Duration::from_millis(ctx.play);

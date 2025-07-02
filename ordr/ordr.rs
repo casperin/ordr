@@ -23,7 +23,7 @@
 //! and `D` data, which will result in only `C` and then `E` being run.
 //!
 //! The letters in the graph, we call nodes. In Rust code, they can be any struct, and they are the
-//! output of an "executor"; an `async` function that takes a "context", any number of other nodes,
+//! output of an "producer"; an `async` function that takes a "context", any number of other nodes,
 //! and returns a `Result<A, YourError>`. The context, is anything you want as long as it implements
 //! `Clone`. It's meant to be used for having database connections or whatever else you need.
 //!
@@ -39,8 +39,8 @@
 //! #[derive(Clone)]
 //! struct A(i32);
 //!
-//! #[executor]
-//! async fn my_a_executor(ctx: Ctx) -> Result<A, Infallible> {
+//! #[producer]
+//! async fn my_a_producer(ctx: Ctx) -> Result<A, Infallible> {
 //!     // Do some actual work
 //!     Ok(A(123))
 //! }
@@ -52,7 +52,7 @@
 //! #derive(Clone)
 //! struct B(i32);
 //!
-//! #[executor]
+//! #[producer]
 //! async fn make_b(ctx: Ctx, a: A) -> Result<B, Infallible> {
 //!     Ok(B(a.0 + 2))
 //! }
@@ -72,7 +72,7 @@
 //! // We also need the Context. If your tasks don't need a context, just use `()`.
 //! let ctx = Ctx {};
 //!
-//! // And we are ready to execute the job. This will execute my_a_executor(ctx)
+//! // And we are ready to execute the job. This will execute my_a_producer(ctx)
 //! // and then make_b(ctx, result_of_a).
 //! let outputs = graph.execute(job, ctx).await.unwrap();
 //!
@@ -87,8 +87,8 @@
 //!
 //! * All nodes and the context must implement `Clone`.
 //! * This is required since both `B` and `C` requires `A` (and `Ctx`).
-//! * All executors must return the same type of error.
-//! * All executors must be async and take the context as first parameter.
+//! * All producers must return the same type of error.
+//! * All producers must be async and take the context as first parameter.
 //!
 //! ## Working with outputs
 //!
@@ -146,7 +146,7 @@
 //! ## Adding input to a job
 //!
 //! If you aleady have results from earlier, or maybe cached somewhere, then you
-//! can add it to the job, and the graph will not run the executors for them (nor
+//! can add it to the job, and the graph will not run the producers for them (nor
 //! its dependencies).
 //!
 //! ```ignore
@@ -169,4 +169,4 @@
 //! ```
 
 pub use ordr_core::{build, error, graph, job, node, outputs};
-pub use ordr_macros::{Output, executor};
+pub use ordr_macros::{Output, producer};

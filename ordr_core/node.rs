@@ -34,14 +34,14 @@ pub struct Node<C, E> {
     /// executes the node, to produce an output.
     ///
     /// This clossure should only downcast its input, then call the provided
-    /// executor.
+    /// producer.
     pub execute:
         Arc<dyn Fn(C, Payload) -> BoxFuture<'static, Result<Payload, E>> + Send + Sync + 'static>,
 }
 
-/// Trait for creating a [`Node`] from an executor function.
+/// Trait for creating a [`Node`] from an producer function.
 ///
-/// Should be implemented automatically using the `executor` macro.
+/// Should be implemented automatically using the `producer` macro.
 pub trait NodeBuilder<C, E> {
     /// Create node.
     fn node() -> Node<C, E>;

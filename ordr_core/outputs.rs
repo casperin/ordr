@@ -18,7 +18,7 @@ impl Outputs {
     /// Get the result for a specific Node.
     ///
     /// Notice that a result may not be there even if the job is fully done, since it may not have
-    /// been needed to run the executor for the node to reach the target.
+    /// been needed to run the producer for the node to reach the target.
     ///
     /// # Panics
     /// If we somehow got the wrong payload mapped to a type. This should not be possible.
@@ -33,7 +33,7 @@ impl Outputs {
     /// Takes the result for a specific Node out of the struct.
     ///
     /// Notice that a result may not be there even if the job is fully done, since it may not have
-    /// been needed to run the executor for the node to reach the target.
+    /// been needed to run the producer for the node to reach the target.
     ///
     /// # Panics
     /// If we somehow got the wrong payload mapped to a type. This should not be possible.

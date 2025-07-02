@@ -51,7 +51,7 @@ impl<C: Ctx, E: Er> Job<C, E> {
     /// #[derive(Clone)]
     /// struct A;
     ///
-    /// #[executor]
+    /// #[producer]
     /// async fn create_a(_: ()) -> Result<A, String> {
     ///     Ok(A)
     /// }
@@ -70,7 +70,7 @@ impl<C: Ctx, E: Er> Job<C, E> {
     /// #[derive(Clone)]
     /// struct A;
     ///
-    /// #[executor]
+    /// #[producer]
     /// async fn create_a(_: ()) -> Result<A, String> {
     ///     Ok(A)
     /// }

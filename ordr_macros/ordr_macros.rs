@@ -12,21 +12,21 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{Data, DeriveInput, Error, Ident, ItemFn, Type, parse_macro_input};
 
-/// Marks an async function as the executor of a node, meaning it can produce that node/Type.
+/// Marks an async function as the producer of a node, meaning it can produce that node/Type.
 /// # Example
 /// ```
 /// #[derive(Clone)]
 /// struct A(i32);
 ///
-/// # use ordr_macros::executor;
+/// # use ordr_macros::producer;
 /// # mod ordr { pub use ordr_core::*; }
-/// #[executor]
+/// #[producer]
 /// async fn make_a(_: ()) -> Result<A, String> {
 ///     Ok(A(22))
 /// }
 /// ```
 #[proc_macro_attribute]
-pub fn executor(attrs: TokenStream, item: TokenStream) -> TokenStream {
+pub fn producer(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let func = parse_macro_input!(item as ItemFn);
     let func_ident = &func.sig.ident;
 
@@ -119,7 +119,7 @@ fn ty_to_string(ty: &Type) -> String {
 /// # Example
 /// ```
 /// # mod ordr { pub use ordr_core::*; pub use ordr_macros::*; }
-/// use ordr::{build, executor, Output, job::Job, error};
+/// use ordr::{build, producer, Output, job::Job, error};
 ///
 /// /// Create our own error. It's a little cumbersome. Maybe you use anyhow?
 /// #[derive(Clone, Debug, Eq, PartialEq)]
@@ -138,11 +138,11 @@ fn ty_to_string(ty: &Type) -> String {
 ///     fail_bar: bool,
 /// }
 ///
-/// // A simple node, and its executor.
+/// // A simple node, and its producer.
 /// #[derive(Clone, Debug, PartialEq)]
 /// struct Foo(i32);
 ///
-/// #[executor]
+/// #[producer]
 /// async fn create_foo(ctx: Ctx) -> Result<Foo, Error> {
 ///     Ok(Foo(ctx.init + 1))
 /// }
@@ -151,7 +151,7 @@ fn ty_to_string(ty: &Type) -> String {
 /// #[derive(Clone, Debug, PartialEq)]
 /// struct Bar(i32);
 ///
-/// #[executor]
+/// #[producer]
 /// async fn create_bar(ctx: Ctx, foo: Foo) -> Result<Bar, Error> {
 ///     if ctx.fail_bar {
 ///         return Err(Error("Bar failed"));

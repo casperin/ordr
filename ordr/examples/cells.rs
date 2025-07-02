@@ -50,7 +50,7 @@ async fn main() {
 mod cells {
     use std::{convert::Infallible, sync::Arc, time::Duration};
 
-    use ordr::executor;
+    use ordr::producer;
     use rand::Rng;
     use tokio::{sync::Mutex, time::sleep};
 
@@ -94,7 +94,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct CellularComponent;
 
-    #[executor]
+    #[producer]
     async fn cellular_component(ctx: Ctx) -> Result<CellularComponent, Infallible> {
         ctx.wait().await;
         Ok(CellularComponent)
@@ -103,7 +103,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct Cell;
 
-    #[executor]
+    #[producer]
     async fn cell(ctx: Ctx, _: CellularComponent) -> Result<Cell, Infallible> {
         ctx.wait().await;
         Ok(Cell)
@@ -112,7 +112,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct CellPart;
 
-    #[executor]
+    #[producer]
     async fn cell_part(ctx: Ctx, _: Cell) -> Result<CellPart, Infallible> {
         ctx.wait().await;
         Ok(CellPart)
@@ -121,7 +121,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct CellSurface;
 
-    #[executor]
+    #[producer]
     async fn cell_surface(ctx: Ctx, _: CellPart) -> Result<CellSurface, Infallible> {
         ctx.wait().await;
         Ok(CellSurface)
@@ -130,7 +130,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct Intracellular;
 
-    #[executor]
+    #[producer]
     async fn intracellular(ctx: Ctx, _: CellPart) -> Result<Intracellular, Infallible> {
         ctx.wait().await;
         Ok(Intracellular)
@@ -139,7 +139,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct ExtracellularRegion;
 
-    #[executor]
+    #[producer]
     async fn extracellular_region(
         ctx: Ctx,
         _: CellularComponent,
@@ -151,7 +151,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct ExtracellularSpace;
 
-    #[executor]
+    #[producer]
     async fn extracellular_space(
         ctx: Ctx,
         _: ExtracellularRegion,
@@ -163,7 +163,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct MembraneEnlosedLumen;
 
-    #[executor]
+    #[producer]
     async fn membrane_enclosed_lumen(
         ctx: Ctx,
         _: CellularComponent,
@@ -175,7 +175,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct Organelle;
 
-    #[executor]
+    #[producer]
     async fn organelle(ctx: Ctx, _: CellularComponent) -> Result<Organelle, Infallible> {
         ctx.wait().await;
         Ok(Organelle)
@@ -184,7 +184,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct Cytoskeleton;
 
-    #[executor]
+    #[producer]
     async fn cytoskeleton(ctx: Ctx, _: NonMembraneOrganelle) -> Result<Cytoskeleton, Infallible> {
         ctx.wait().await;
         Ok(Cytoskeleton)
@@ -193,7 +193,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct MicrotubuleCytoskeleton;
 
-    #[executor]
+    #[producer]
     async fn microtubule_cytoskeleton(
         ctx: Ctx,
         _: Cytoskeleton,
@@ -205,7 +205,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct IntracellularOrganelle;
 
-    #[executor]
+    #[producer]
     async fn intracellular_organelle(
         ctx: Ctx,
         _: Organelle,
@@ -217,7 +217,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct Nucleus;
 
-    #[executor]
+    #[producer]
     async fn nucleus(ctx: Ctx, _: MembraneOrganelle) -> Result<Nucleus, Infallible> {
         ctx.wait().await;
         Ok(Nucleus)
@@ -226,7 +226,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct IntracellularOrganelleLumen;
 
-    #[executor]
+    #[producer]
     async fn intracellular_organelle_lumen(
         ctx: Ctx,
         _: OrganelleLumen,
@@ -238,7 +238,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct ExtracelularRegionPart;
 
-    #[executor]
+    #[producer]
     async fn extracellular_region_part(
         ctx: Ctx,
         _: ExtracellularRegion,
@@ -251,7 +251,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct NonMembraneOrganelle;
 
-    #[executor]
+    #[producer]
     async fn non_membrane_organelle(
         ctx: Ctx,
         _: Organelle,
@@ -264,7 +264,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct OrganellePart;
 
-    #[executor]
+    #[producer]
     async fn organelle_part(
         ctx: Ctx,
         _: CellularComponent,
@@ -277,7 +277,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct IntracellularPart;
 
-    #[executor]
+    #[producer]
     async fn intracellular_part(
         ctx: Ctx,
         _: Intracellular,
@@ -290,7 +290,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct CytoskeletalPart;
 
-    #[executor]
+    #[producer]
     async fn cytoskeletal_part(
         ctx: Ctx,
         _: IntracellularOrganellePart,
@@ -303,7 +303,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct MembraneOrganelle;
 
-    #[executor]
+    #[producer]
     async fn membrane_organelle(
         ctx: Ctx,
         _: Organelle,
@@ -316,7 +316,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct NuclearPart;
 
-    #[executor]
+    #[producer]
     async fn nuclear_part(
         ctx: Ctx,
         _: Nucleus,
@@ -329,7 +329,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct OrganelleLumen;
 
-    #[executor]
+    #[producer]
     async fn organelle_lumen(
         ctx: Ctx,
         _: OrganellePart,
@@ -342,7 +342,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct NuclearLumen;
 
-    #[executor]
+    #[producer]
     async fn nuclear_lumen(
         ctx: Ctx,
         _: NuclearPart,
@@ -354,7 +354,7 @@ mod cells {
 
     #[derive(Clone, Debug)]
     pub struct IntracellularOrganellePart;
-    #[executor]
+    #[producer]
     async fn intracellular_organelle_part(
         ctx: Ctx,
         _: OrganellePart,
@@ -368,7 +368,7 @@ mod cells {
     #[derive(Clone, Debug)]
     pub struct Spindle;
 
-    #[executor]
+    #[producer]
     async fn spindle(
         ctx: Ctx,
         _: MicrotubuleCytoskeleton,

@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 
-use ordr::{build, error::Error, executor, job::Job};
+use ordr::{build, error::Error, producer, job::Job};
 
 #[derive(Clone)]
 struct Ctx;
@@ -8,16 +8,16 @@ struct Ctx;
 #[derive(Clone, Debug, PartialEq)]
 struct A(usize);
 
-#[executor]
+#[producer]
 async fn make_a(_ctx: Ctx) -> Result<A, Infallible> {
     Ok(A(1))
 }
 
-/// Node B and its executor. Depends on A. Fails!
+/// Node B and its producer. Depends on A. Fails!
 #[derive(Clone, Debug, PartialEq)]
 struct B(usize);
 
-#[executor]
+#[producer]
 async fn make_b(_ctx: Ctx, A(a): A) -> Result<B, Infallible> {
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
     Ok(B(a + 2))

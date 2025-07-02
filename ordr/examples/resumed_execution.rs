@@ -1,4 +1,4 @@
-use ordr::{Output, build, error, executor, job::Job};
+use ordr::{Output, build, error, producer, job::Job};
 
 #[derive(Clone, Debug)]
 struct Error(&'static str);
@@ -18,16 +18,16 @@ struct Ctx {
 #[derive(Clone, Debug, PartialEq)]
 struct A(usize);
 
-#[executor]
+#[producer]
 async fn make_a(ctx: Ctx) -> Result<A, Error> {
     Ok(A(ctx.init + 1))
 }
 
-/// Node B and its executor. Depends on A.
+/// Node B and its producer. Depends on A.
 #[derive(Clone, Debug, PartialEq)]
 struct B(usize);
 
-#[executor]
+#[producer]
 async fn make_b(ctx: Ctx, A(a): A) -> Result<B, Error> {
     match ctx.fail_b {
         true => Err(Error("B failed")),

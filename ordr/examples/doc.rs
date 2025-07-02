@@ -1,4 +1,4 @@
-use ordr::{build, executor, job::Job};
+use ordr::{build, producer, job::Job};
 
 use rand::Rng;
 use tokio::{sync::Mutex, time::sleep};
@@ -11,7 +11,7 @@ macro_rules! node {
         #[derive(Debug, Clone)]
         struct $ty;
 
-        #[executor]
+        #[producer]
         async fn $name(ctx: Ctx) -> Result<$ty, std::convert::Infallible> {
             ctx.wait().await;
             Ok($ty)
@@ -22,7 +22,7 @@ macro_rules! node {
         #[derive(Debug, Clone)]
         struct $ty;
 
-        #[executor]
+        #[producer]
         async fn $name(ctx: Ctx, $( _: $dep ),* ) -> Result<$ty, std::convert::Infallible> {
             ctx.wait().await;
             Ok($ty)

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use ordr::{build, error::Error, executor, job::Job};
+use ordr::{build, error::Error, producer, job::Job};
 
 #[derive(Clone)]
 #[allow(unused)]
@@ -20,7 +20,7 @@ macro_rules! node {
         #[derive(Clone, Debug, PartialEq, Eq)]
         pub(crate) struct $ty;
 
-        #[executor]
+        #[producer]
         async fn $name(_ctx: Ctx) -> Result<$ty, E> {
             $ret
         }
@@ -30,7 +30,7 @@ macro_rules! node {
         #[derive(Clone, Debug, PartialEq, Eq)]
         pub(crate) struct $ty;
 
-        #[executor]
+        #[producer]
         async fn $name(_ctx: Ctx, $( _: $dep ),*) -> Result<$ty, E> {
             $ret
         }
@@ -76,7 +76,7 @@ mod parse_attr {
     #[derive(Clone)]
     struct A;
 
-    #[executor(name = "OtherName", output = A, error = E)]
+    #[producer(name = "OtherName", output = A, error = E)]
     async fn a(_: ()) -> R<A> {
         Ok(A)
     }
@@ -176,7 +176,7 @@ mod cancelled {
         #[derive(Clone, Debug, PartialEq, Eq)]
         struct C;
 
-        #[executor]
+        #[producer]
         async fn c(_: Ctx, _: B) -> Result<C, E> {
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             Ok(C)
@@ -224,7 +224,7 @@ mod error_type {
         #[derive(Clone)]
         struct A;
 
-        #[executor]
+        #[producer]
         async fn make_a(_: ()) -> Result<A, E> {
             Err(E::BadError)
         }
@@ -235,7 +235,7 @@ mod error_type {
         #[derive(Clone)]
         struct A;
 
-        #[executor]
+        #[producer]
         async fn make_a(_: ()) -> Result<A, anyhow::Error> {
             bail!("Oh no!")
         }
@@ -247,7 +247,7 @@ mod input {
 
     #[tokio::test]
     async fn add_input_to_job() {
-        node!(a: A, Err(E)); // We can't use this executor to create an A
+        node!(a: A, Err(E)); // We can't use this producer to create an A
         node!(b: B, Ok(B), A);
         let graph = build!(A, B).unwrap();
         let job = Job::new().with_target::<B>().with_input(A); // We insert A manually
@@ -271,12 +271,12 @@ mod resume_job {
         #[derive(Clone, Debug, PartialEq, Eq)]
         struct C(u8);
 
-        #[executor]
+        #[producer]
         async fn a(ctx: u8) -> Result<A, E> {
             Ok(A(ctx + 1))
         }
 
-        #[executor]
+        #[producer]
         async fn b(ctx: u8, A(a): A) -> Result<B, E> {
             match ctx {
                 0 => Err(E),
@@ -284,7 +284,7 @@ mod resume_job {
             }
         }
 
-        #[executor]
+        #[producer]
         async fn c(ctx: u8, B(b): B) -> Result<C, E> {
             Ok(C(ctx + b + 1))
         }
@@ -349,12 +349,12 @@ mod concurrent {
     #[derive(Clone, Debug, PartialEq, Eq)]
     struct C;
 
-    #[executor]
+    #[producer]
     async fn a(_: Ctx) -> Result<A, E> {
         Ok(A)
     }
 
-    #[executor]
+    #[producer]
     async fn b(ctx: Ctx, _: A) -> Result<B, E> {
         ctx.events.lock().await.push("start");
         sleep(Duration::from_millis(20)).await;
@@ -362,7 +362,7 @@ mod concurrent {
         Ok(B)
     }
 
-    #[executor]
+    #[producer]
     async fn c(ctx: Ctx, _: A) -> Result<C, E> {
         ctx.events.lock().await.push("start");
         sleep(Duration::from_millis(20)).await;

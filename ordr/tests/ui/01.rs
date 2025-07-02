@@ -1,4 +1,4 @@
-use ordr::{build, executor, job::Job};
+use ordr::{build, producer, job::Job};
 
 use std::convert::Infallible;
 
@@ -14,22 +14,22 @@ struct Video(usize);
 #[derive(Clone, Debug)]
 struct Mux(usize);
 
-#[executor]
+#[producer]
 async fn raw(_ctx: Ctx) -> Result<Raw, Infallible> {
     Ok(Raw(1))
 }
 
-#[executor(output = Audio)]
+#[producer(output = Audio)]
 async fn audio(_ctx: Ctx, raw: Raw) -> Result<Audio, Infallible> {
     Ok(Audio(2 + raw.0))
 }
 
-#[executor]
+#[producer]
 async fn video(_ctx: Ctx, raw: Raw) -> Result<Video, Infallible> {
     Ok(Video(4 + raw.0))
 }
 
-#[executor]
+#[producer]
 async fn mux(_ctx: Ctx, audio: Audio, video: Video) -> Result<Mux, Infallible> {
     Ok(Mux(8 + audio.0 + video.0))
 }

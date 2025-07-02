@@ -1,6 +1,6 @@
 use std::{convert::Infallible, time::Duration};
 
-use ordr::{build, executor, job::Job};
+use ordr::{build, producer, job::Job};
 
 #[derive(Debug, Clone)]
 struct A;
@@ -13,31 +13,31 @@ struct D;
 #[derive(Debug, Clone)]
 struct E;
 
-#[executor]
+#[producer]
 async fn a(_: ()) -> Result<A, Infallible> {
     wait("A", "31", 0).await;
     Ok(A)
 }
 
-#[executor]
+#[producer]
 async fn b(_: (), _: A) -> Result<B, Infallible> {
     wait("B", "32", 15).await;
     Ok(B)
 }
 
-#[executor]
+#[producer]
 async fn c(_: (), _: A) -> Result<C, Infallible> {
     wait("C", "33", 40).await;
     Ok(C)
 }
 
-#[executor]
+#[producer]
 async fn d(_: (), _: B) -> Result<D, Infallible> {
     wait("D", "35", 15).await;
     Ok(D)
 }
 
-#[executor]
+#[producer]
 async fn e(_: (), _: C, _: D) -> Result<E, Infallible> {
     wait("E", "36", 0).await;
     Ok(E)

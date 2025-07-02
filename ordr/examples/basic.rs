@@ -1,43 +1,43 @@
 use std::convert::Infallible;
 
-use ordr::{build, executor, job::Job};
+use ordr::{build, producer, job::Job};
 
 /// Basic Ctx for the nodes. You can put anything in it, as long as it implements `Clone`.
 #[derive(Clone)]
 struct Ctx;
 
-/// Node A and its executor.
+/// Node A and its producer.
 #[derive(Clone, Debug)]
 struct A(usize);
 
-#[executor]
+#[producer]
 async fn make_a(_ctx: Ctx) -> Result<A, Infallible> {
     Ok(A(1))
 }
 
-/// Node B and its executor. Depends on A.
+/// Node B and its producer. Depends on A.
 #[derive(Clone, Debug)]
 struct B(usize);
 
-#[executor]
+#[producer]
 async fn make_b(_ctx: Ctx, A(a): A) -> Result<B, Infallible> {
     Ok(B(2 + a))
 }
 
-/// Node C and its executor. Depends on A.
+/// Node C and its producer. Depends on A.
 #[derive(Clone, Debug)]
 struct C(usize);
 
-#[executor]
+#[producer]
 async fn make_c(_ctx: Ctx, A(a): A) -> Result<C, Infallible> {
     Ok(C(3 + a))
 }
 
-/// Node D and its executor. Depends on B and C.
+/// Node D and its producer. Depends on B and C.
 #[derive(Clone, Debug, PartialEq)]
 struct D(usize);
 
-#[executor]
+#[producer]
 async fn make_d(_ctx: Ctx, B(b): B, C(c): C) -> Result<D, Infallible> {
     Ok(D(4 + b + c))
 }

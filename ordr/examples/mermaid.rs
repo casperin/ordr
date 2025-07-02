@@ -2,12 +2,12 @@
 
 use std::convert::Infallible;
 
-use ordr::{build, executor, job::Job};
+use ordr::{build, producer, job::Job};
 
 #[derive(Debug, Clone)]
 struct Trees(usize);
 
-#[executor]
+#[producer]
 async fn trees(_: ()) -> Result<Trees, Infallible> {
     Ok(Trees(3))
 }
@@ -15,7 +15,7 @@ async fn trees(_: ()) -> Result<Trees, Infallible> {
 #[derive(Debug, Clone)]
 struct Friends(Vec<&'static str>);
 
-#[executor]
+#[producer]
 async fn make_friends(_: ()) -> Result<Friends, Infallible> {
     Ok(Friends(vec!["Paul", "Sarah", "Ida"]))
 }
@@ -23,7 +23,7 @@ async fn make_friends(_: ()) -> Result<Friends, Infallible> {
 #[derive(Debug, Clone)]
 struct Money(usize);
 
-#[executor]
+#[producer]
 async fn work(_: ()) -> Result<Money, Infallible> {
     Ok(Money(152))
 }
@@ -31,7 +31,7 @@ async fn work(_: ()) -> Result<Money, Infallible> {
 #[derive(Debug, Clone)]
 struct Paper(usize);
 
-#[executor]
+#[producer]
 async fn chop_trees(_: (), _trees: Trees, _friends: Friends) -> Result<Paper, Infallible> {
     Ok(Paper(152))
 }
@@ -39,7 +39,7 @@ async fn chop_trees(_: (), _trees: Trees, _friends: Friends) -> Result<Paper, In
 #[derive(Debug, Clone)]
 struct Ideas(Vec<&'static str>);
 
-#[executor]
+#[producer]
 async fn travel(_: (), _money: Money) -> Result<Ideas, Infallible> {
     Ok(Ideas(vec!["Cats are great", "Dogs too"]))
 }
@@ -47,7 +47,7 @@ async fn travel(_: (), _money: Money) -> Result<Ideas, Infallible> {
 #[derive(Debug, Clone)]
 struct GetRich(usize);
 
-#[executor]
+#[producer]
 async fn write_amazing_book(_: (), _paper: Paper, _ideas: Ideas) -> Result<GetRich, Infallible> {
     Ok(GetRich(152))
 }
@@ -55,7 +55,7 @@ async fn write_amazing_book(_: (), _paper: Paper, _ideas: Ideas) -> Result<GetRi
 #[derive(Debug, Clone)]
 struct HaveFun(bool);
 
-#[executor]
+#[producer]
 async fn play(_: (), _friends: Friends, _ideas: Ideas) -> Result<HaveFun, Infallible> {
     Ok(HaveFun(true))
 }

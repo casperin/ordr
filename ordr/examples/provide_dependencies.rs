@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 
-use ordr::{build, executor, job::Job};
+use ordr::{build, producer, job::Job};
 
 #[derive(Clone)]
 struct Ctx;
@@ -8,16 +8,16 @@ struct Ctx;
 #[derive(Clone, Debug)]
 struct A(usize);
 
-#[executor]
+#[producer]
 async fn make_a(_ctx: Ctx) -> Result<A, Infallible> {
     Ok(A(1))
 }
 
-/// Node B and its executor. Depends on A.
+/// Node B and its producer. Depends on A.
 #[derive(Clone, Debug, PartialEq)]
 struct B(usize);
 
-#[executor]
+#[producer]
 async fn make_b(_ctx: Ctx, A(a): A) -> Result<B, Infallible> {
     Ok(B(2 + a))
 }

@@ -119,7 +119,7 @@ fn ty_to_string(ty: &Type) -> String {
 /// # Example
 /// ```
 /// # mod ordr { pub use ordr_core::*; pub use ordr_macros::*; }
-/// use ordr::{build_graph, executor, Output, job::Job, error};
+/// use ordr::{build, executor, Output, job::Job, error};
 ///
 /// /// Create our own error. It's a little cumbersome. Maybe you use anyhow?
 /// #[derive(Clone, Debug, Eq, PartialEq)]
@@ -167,7 +167,7 @@ fn ty_to_string(ty: &Type) -> String {
 /// }
 ///
 /// # async {
-/// let graph = build_graph!(Foo, Bar).unwrap();
+/// let graph = build!(Foo, Bar).unwrap();
 ///
 /// let job = Job::new().with_target::<Bar>();
 ///

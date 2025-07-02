@@ -1,6 +1,6 @@
 use std::{convert::Infallible, time::Duration};
 
-use ordr::{build, producer, job::Job};
+use ordr::{build, job::Job, producer};
 
 #[derive(Debug, Clone)]
 struct A;

@@ -14,9 +14,8 @@ pub enum Error<E: Er> {
     /// A node is dependent on a node that isn't in the graph. The string is the name of the node
     /// having an unknown dependency, and the type id is that of the unknown node.
     DependencyNotFound(&'static str, TypeId),
-    /// Your graph contains a cycle. The string is a visual representation of the path.
-    /// Eg. `A -> B -> C -> A`.
-    Cycle(Vec<&'static str>),
+    /// Your graph contains a cycle.
+    Cycle(Vec<usize>),
     /// Execution of a job was cancelled from the outside.
     Cancelled {
         /// The outputs of the nodes already executed.
@@ -48,7 +47,7 @@ impl<E: Er> std::fmt::Display for Error<E> {
             Error::DependencyNotFound(name, type_id) => {
                 write!(f, "Node {name} has an unknown dependency: {type_id:?}")
             }
-            Error::Cycle(names) => write!(f, "Found a cycle in your graph: {}", names.join(" -> ")),
+            Error::Cycle(names) => write!(f, "Found a cycle in your graph: {names:?}"),
             Error::Cancelled { .. } => write!(f, "Job was cancelled"),
             Error::NodePanic { error, .. } => write!(f, "Node panicked {error}"),
             Error::NodeFailed { i, error, .. } => {

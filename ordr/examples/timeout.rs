@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 
-use ordr::{build, error::Error, producer, job::Job};
+use ordr::{build, error::Error, job::Job, producer};
 
 #[derive(Clone)]
 struct Ctx;

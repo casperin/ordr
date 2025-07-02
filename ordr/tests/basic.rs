@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use ordr::{build, error::Error, producer, job::Job};
+use ordr::{build, error::Error, job::Job, producer};
 
 #[derive(Clone)]
 #[allow(unused)]
@@ -342,17 +342,12 @@ mod concurrent {
         events: Arc<Mutex<Vec<&'static str>>>,
     }
 
-    #[derive(Clone, Debug, PartialEq, Eq)]
-    struct A;
+    node!(a: A, Ok(A));
+
     #[derive(Clone, Debug, PartialEq, Eq)]
     struct B;
     #[derive(Clone, Debug, PartialEq, Eq)]
     struct C;
-
-    #[producer]
-    async fn a(_: Ctx) -> Result<A, E> {
-        Ok(A)
-    }
 
     #[producer]
     async fn b(ctx: Ctx, _: A) -> Result<B, E> {

@@ -1,4 +1,4 @@
-use ordr::{build, producer, job::Job};
+use ordr::{build, job::Job, producer};
 
 use rand::Rng;
 use tokio::{sync::Mutex, time::sleep};

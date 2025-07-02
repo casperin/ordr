@@ -1,6 +1,6 @@
 use std::convert::Infallible;
 
-use ordr::{build, producer, job::Job};
+use ordr::{build, job::Job, producer};
 
 /// Basic Ctx for the nodes. You can put anything in it, as long as it implements `Clone`.
 #[derive(Clone)]

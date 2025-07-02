@@ -28,8 +28,7 @@ pub(crate) fn validate_nodes<C: Ctx, E: Er>(
     }
 
     if let Some(cycle) = find_cycle(&adj) {
-        let names: Vec<_> = cycle.iter().map(|&i| nodes[i].name).collect();
-        return Err(Error::Cycle(names));
+        return Err(Error::Cycle(cycle));
     }
 
     Ok(adj)

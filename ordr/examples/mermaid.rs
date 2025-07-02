@@ -2,7 +2,7 @@
 
 use std::convert::Infallible;
 
-use ordr::{build, producer, job::Job};
+use ordr::{build, job::Job, producer};
 
 #[derive(Debug, Clone)]
 struct Trees(usize);

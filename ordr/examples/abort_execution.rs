@@ -1,4 +1,4 @@
-use ordr::{build, error, producer, job::Job};
+use ordr::{build, error, job::Job, producer};
 
 #[derive(Clone, Debug)]
 struct Error(&'static str);

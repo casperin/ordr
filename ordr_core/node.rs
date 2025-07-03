@@ -12,6 +12,7 @@ type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// Struct describing everything needed to find dependencies and execute this node.
 #[allow(clippy::type_complexity)]
+#[derive(Clone)]
 pub struct Node<C, E> {
     /// Name of this node. Only used for display.
     pub name: &'static str,
@@ -37,6 +38,12 @@ pub struct Node<C, E> {
     /// producer.
     pub execute:
         Arc<dyn Fn(C, Payload) -> BoxFuture<'static, Result<Payload, E>> + Send + Sync + 'static>,
+}
+
+impl<C, E> std::fmt::Debug for Node<C, E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Node<{}>", self.name)
+    }
 }
 
 /// Trait for creating a [`Node`] from an producer function.

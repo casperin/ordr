@@ -83,6 +83,7 @@ impl<C: Ctx, E: Er> Builder<C, E> {
 }
 
 /// Main struct of this crate. Holds a list of all nodes and keeps track of dependencies between them.
+#[derive(Clone, Debug)]
 pub struct Graph<C: Ctx, E: Er> {
     /// List of all nodes in the graph.
     pub(crate) nodes: Vec<Node<C, E>>,

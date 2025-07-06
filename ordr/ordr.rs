@@ -1,6 +1,6 @@
 #![warn(missing_docs)]
 
-//! Ordr (タコ) is a library that helps you execute and keep track of a set of interdependent functions.
+//! Ordr is a library that helps you execute and keep track of a set of interdependent functions.
 //!
 //! It can create a graph (specifically a `DAG`) of functions depending on functions, and execute them as they get ready, in parallel.
 //!
@@ -168,5 +168,8 @@
 //! cancellation_token.cancel();
 //! ```
 
-pub use ordr_core::{build, error, graph, job, node, outputs};
-pub use ordr_macros::{Output, producer};
+// pub use ordr_core::{build, error, graph, job, node, outputs};
+// pub use ordr_macros::{Output, producer};
+
+pub use ordr_core::*;
+pub use ordr_macros::producer;

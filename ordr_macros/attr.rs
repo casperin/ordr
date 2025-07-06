@@ -9,8 +9,8 @@ pub(super) struct Attr {
     pub(super) name: Option<String>,
     /// The type of the output
     pub(super) out: Option<Type>,
-    /// The type of the output err
-    pub(super) err: Option<Type>,
+    /// The type of the input state
+    pub(super) state: Option<Type>,
 }
 
 impl Attr {
@@ -29,9 +29,9 @@ impl Attr {
             return Ok(());
         }
 
-        if meta.path.is_ident("error") {
+        if meta.path.is_ident("state") {
             let ty: syn::Type = meta.value()?.parse()?;
-            self.err = Some(ty);
+            self.state = Some(ty);
             return Ok(());
         }
 
@@ -58,10 +58,11 @@ mod tests {
 
     #[test]
     fn test_parse_results_name_output() {
-        let args = parse_quote! { name = "foo", output = Foo };
+        let args = parse_quote! { name = "foo", output = Foo, state = State };
         let args = parse_args(args);
 
         assert_eq!(args.out.into_token_stream().to_string(), "Foo");
         assert_eq!(args.name.as_deref(), Some("foo"));
+        assert_eq!(args.state.into_token_stream().to_string(), "State");
     }
 }

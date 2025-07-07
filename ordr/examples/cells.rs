@@ -1,56 +1,28 @@
-use ordr::{build, job::Job};
-
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt().init();
 
-    let graph = build!(
-        cells::CellularComponent,
-        cells::Cell,
-        cells::CellPart,
-        cells::CellSurface,
-        cells::Intracellular,
-        cells::ExtracellularRegion,
-        cells::ExtracelularRegionPart,
-        cells::ExtracellularSpace,
-        cells::MembraneEnlosedLumen,
-        cells::Organelle,
-        cells::NonMembraneOrganelle,
-        cells::Cytoskeleton,
-        cells::MicrotubuleCytoskeleton,
-        cells::IntracellularOrganelle,
-        cells::OrganellePart,
-        cells::IntracellularPart,
-        cells::IntracellularOrganellePart,
-        cells::CytoskeletalPart,
-        cells::Spindle,
-        cells::MembraneOrganelle,
-        cells::Nucleus,
-        cells::NuclearPart,
-        cells::OrganelleLumen,
-        cells::IntracellularOrganelleLumen,
-        cells::NuclearLumen,
-    )
-    .unwrap();
-
-    let job = Job::new()
+    let job = ordr::Job::builder()
         // .with_input(cells::IntracellularPart)
-        .with_target::<cells::Nucleus>()
-        .with_target::<cells::Spindle>();
-
-    let diagram = graph.mermaid(&job);
-    println!("{diagram}");
+        .add::<cells::Nucleus>()
+        .add::<cells::Spindle>()
+        .build()
+        .unwrap();
 
     let ctx = cells::Ctx::new();
 
-    let res = graph.execute(job, ctx).await;
-    let _ = dbg!(res);
+    let (tx, mut rx) = tokio::sync::mpsc::channel(10000);
+    let p = ordr::run_job(job.clone(), ctx, tx);
+    tokio::spawn(p);
+
+    while let Some(msg) = rx.recv().await {
+        tracing::info!(?msg, "Msg");
+    }
 }
 
 mod cells {
-    use std::{convert::Infallible, sync::Arc, time::Duration};
+    use std::{sync::Arc, time::Duration};
 
-    use ordr::producer;
     use rand::Rng;
     use tokio::{sync::Mutex, time::sleep};
 
@@ -91,291 +63,51 @@ mod cells {
         }
     }
 
-    #[derive(Clone, Debug)]
-    pub struct CellularComponent;
-
-    #[producer]
-    async fn cellular_component(ctx: Ctx) -> Result<CellularComponent, Infallible> {
-        ctx.wait().await;
-        Ok(CellularComponent)
+    macro_rules! node {
+        // No deps
+        ($ident:ident: $ty:ident) => {
+            #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+            pub struct $ty;
+            #[ordr::producer]
+            async fn $ident(c: ordr::Context<Ctx>) -> Result<$ty, ordr::Error> {
+                c.state.wait().await;
+                Ok($ty)
+            }
+        };
+        ( $ident:ident: $ty:ident, $( $dep:ident ),* ) => {
+            #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+            pub struct $ty;
+            #[ordr::producer]
+            async fn $ident(c: ordr::Context<Ctx>, $( _: $dep ),*) -> Result<$ty, ordr::Error> {
+                c.state.wait().await;
+                Ok($ty)
+            }
+        }
     }
 
-    #[derive(Clone, Debug)]
-    pub struct Cell;
-
-    #[producer]
-    async fn cell(ctx: Ctx, _: CellularComponent) -> Result<Cell, Infallible> {
-        ctx.wait().await;
-        Ok(Cell)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct CellPart;
-
-    #[producer]
-    async fn cell_part(ctx: Ctx, _: Cell) -> Result<CellPart, Infallible> {
-        ctx.wait().await;
-        Ok(CellPart)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct CellSurface;
-
-    #[producer]
-    async fn cell_surface(ctx: Ctx, _: CellPart) -> Result<CellSurface, Infallible> {
-        ctx.wait().await;
-        Ok(CellSurface)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct Intracellular;
-
-    #[producer]
-    async fn intracellular(ctx: Ctx, _: CellPart) -> Result<Intracellular, Infallible> {
-        ctx.wait().await;
-        Ok(Intracellular)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct ExtracellularRegion;
-
-    #[producer]
-    async fn extracellular_region(
-        ctx: Ctx,
-        _: CellularComponent,
-    ) -> Result<ExtracellularRegion, Infallible> {
-        ctx.wait().await;
-        Ok(ExtracellularRegion)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct ExtracellularSpace;
-
-    #[producer]
-    async fn extracellular_space(
-        ctx: Ctx,
-        _: ExtracellularRegion,
-    ) -> Result<ExtracellularSpace, Infallible> {
-        ctx.wait().await;
-        Ok(ExtracellularSpace)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct MembraneEnlosedLumen;
-
-    #[producer]
-    async fn membrane_enclosed_lumen(
-        ctx: Ctx,
-        _: CellularComponent,
-    ) -> Result<MembraneEnlosedLumen, Infallible> {
-        ctx.wait().await;
-        Ok(MembraneEnlosedLumen)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct Organelle;
-
-    #[producer]
-    async fn organelle(ctx: Ctx, _: CellularComponent) -> Result<Organelle, Infallible> {
-        ctx.wait().await;
-        Ok(Organelle)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct Cytoskeleton;
-
-    #[producer]
-    async fn cytoskeleton(ctx: Ctx, _: NonMembraneOrganelle) -> Result<Cytoskeleton, Infallible> {
-        ctx.wait().await;
-        Ok(Cytoskeleton)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct MicrotubuleCytoskeleton;
-
-    #[producer]
-    async fn microtubule_cytoskeleton(
-        ctx: Ctx,
-        _: Cytoskeleton,
-    ) -> Result<MicrotubuleCytoskeleton, Infallible> {
-        ctx.wait().await;
-        Ok(MicrotubuleCytoskeleton)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct IntracellularOrganelle;
-
-    #[producer]
-    async fn intracellular_organelle(
-        ctx: Ctx,
-        _: Organelle,
-    ) -> Result<IntracellularOrganelle, Infallible> {
-        ctx.wait().await;
-        Ok(IntracellularOrganelle)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct Nucleus;
-
-    #[producer]
-    async fn nucleus(ctx: Ctx, _: MembraneOrganelle) -> Result<Nucleus, Infallible> {
-        ctx.wait().await;
-        Ok(Nucleus)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct IntracellularOrganelleLumen;
-
-    #[producer]
-    async fn intracellular_organelle_lumen(
-        ctx: Ctx,
-        _: OrganelleLumen,
-    ) -> Result<IntracellularOrganelleLumen, Infallible> {
-        ctx.wait().await;
-        Ok(IntracellularOrganelleLumen)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct ExtracelularRegionPart;
-
-    #[producer]
-    async fn extracellular_region_part(
-        ctx: Ctx,
-        _: ExtracellularRegion,
-        _: CellularComponent,
-    ) -> Result<ExtracelularRegionPart, Infallible> {
-        ctx.wait().await;
-        Ok(ExtracelularRegionPart)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct NonMembraneOrganelle;
-
-    #[producer]
-    async fn non_membrane_organelle(
-        ctx: Ctx,
-        _: Organelle,
-        _: IntracellularOrganelle,
-    ) -> Result<NonMembraneOrganelle, Infallible> {
-        ctx.wait().await;
-        Ok(NonMembraneOrganelle)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct OrganellePart;
-
-    #[producer]
-    async fn organelle_part(
-        ctx: Ctx,
-        _: CellularComponent,
-        _: Organelle,
-    ) -> Result<OrganellePart, Infallible> {
-        ctx.wait().await;
-        Ok(OrganellePart)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct IntracellularPart;
-
-    #[producer]
-    async fn intracellular_part(
-        ctx: Ctx,
-        _: Intracellular,
-        _: CellPart,
-    ) -> Result<IntracellularPart, Infallible> {
-        ctx.wait().await;
-        Ok(IntracellularPart)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct CytoskeletalPart;
-
-    #[producer]
-    async fn cytoskeletal_part(
-        ctx: Ctx,
-        _: IntracellularOrganellePart,
-        _: Cytoskeleton,
-    ) -> Result<CytoskeletalPart, Infallible> {
-        ctx.wait().await;
-        Ok(CytoskeletalPart)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct MembraneOrganelle;
-
-    #[producer]
-    async fn membrane_organelle(
-        ctx: Ctx,
-        _: Organelle,
-        _: IntracellularOrganelle,
-    ) -> Result<MembraneOrganelle, Infallible> {
-        ctx.wait().await;
-        Ok(MembraneOrganelle)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct NuclearPart;
-
-    #[producer]
-    async fn nuclear_part(
-        ctx: Ctx,
-        _: Nucleus,
-        _: IntracellularOrganellePart,
-    ) -> Result<NuclearPart, Infallible> {
-        ctx.wait().await;
-        Ok(NuclearPart)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct OrganelleLumen;
-
-    #[producer]
-    async fn organelle_lumen(
-        ctx: Ctx,
-        _: OrganellePart,
-        _: MembraneEnlosedLumen,
-    ) -> Result<OrganelleLumen, Infallible> {
-        ctx.wait().await;
-        Ok(OrganelleLumen)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct NuclearLumen;
-
-    #[producer]
-    async fn nuclear_lumen(
-        ctx: Ctx,
-        _: NuclearPart,
-        _: IntracellularOrganelleLumen,
-    ) -> Result<NuclearLumen, Infallible> {
-        ctx.wait().await;
-        Ok(NuclearLumen)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct IntracellularOrganellePart;
-    #[producer]
-    async fn intracellular_organelle_part(
-        ctx: Ctx,
-        _: OrganellePart,
-        _: IntracellularPart,
-        _: IntracellularOrganelle,
-    ) -> Result<IntracellularOrganellePart, Infallible> {
-        ctx.wait().await;
-        Ok(IntracellularOrganellePart)
-    }
-
-    #[derive(Clone, Debug)]
-    pub struct Spindle;
-
-    #[producer]
-    async fn spindle(
-        ctx: Ctx,
-        _: MicrotubuleCytoskeleton,
-        _: NonMembraneOrganelle,
-        _: CytoskeletalPart,
-    ) -> Result<Spindle, Infallible> {
-        ctx.wait().await;
-        Ok(Spindle)
-    }
+    node!(cellular_component: CellularComponent);
+    node!(cell: Cell, CellularComponent);
+    node!(cell_part: CellPart, Cell);
+    node!(cell_surface: CellSurface, CellPart);
+    node!(intracellular: Intracellular, CellPart);
+    node!(extracellular_region: ExtracellularRegion, CellularComponent);
+    node!(extracellular_space: ExtracellularSpace, ExtracellularRegion);
+    node!(membrane_enclosed_lumen: MembraneEnlosedLumen, CellularComponent);
+    node!(organelle: Organelle, CellularComponent);
+    node!(cytoskeleton: Cytoskeleton, NonMembraneOrganelle);
+    node!(microtubule_cytoskeleton: MicrotubuleCytoskeleton, Cytoskeleton);
+    node!(intracellular_organelle: IntracellularOrganelle, Organelle);
+    node!(nucleus: Nucleus, MembraneOrganelle);
+    node!(intracellular_organelle_lumen: IntracellularOrganelleLumen, OrganelleLumen);
+    node!(extracellular_region_part: ExtracelularRegionPart, ExtracellularRegion, CellularComponent);
+    node!(non_membrane_organelle: NonMembraneOrganelle, Organelle, IntracellularOrganelle);
+    node!(organelle_part: OrganellePart, CellularComponent, Organelle);
+    node!(intracellular_part: IntracellularPart, Intracellular, CellPart);
+    node!(cytoskeletal_part: CytoskeletalPart, IntracellularOrganellePart, Cytoskeleton);
+    node!(membrane_organelle: MembraneOrganelle, Organelle, IntracellularOrganelle);
+    node!(nuclear_part: NuclearPart, Nucleus, IntracellularOrganellePart);
+    node!(organelle_lumen: OrganelleLumen, OrganellePart, MembraneEnlosedLumen);
+    node!(nuclear_lumen: NuclearLumen, NuclearPart, IntracellularOrganelleLumen);
+    node!(intracellular_organelle_part: IntracellularOrganellePart, OrganellePart, IntracellularPart,  IntracellularOrganelle);
+    node!(spindle: Spindle, MicrotubuleCytoskeleton, NonMembraneOrganelle, CytoskeletalPart);
 }

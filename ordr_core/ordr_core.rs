@@ -1,7 +1,7 @@
 #![allow(unused)]
 
 pub use serde;
-pub use serde_cbor;
+pub use serde_json;
 
 mod base;
 pub use base::*;

@@ -15,6 +15,30 @@ pub(super) fn input(sig: &Signature) -> Vec<Type> {
         .collect::<Vec<_>>()
 }
 
+/// Given something like `Result<T, E>` or `Context<T>` this function will return `T`.
+pub(super) fn first_generic(ty: &Type) -> Type {
+    let e = syn::Error::new(
+        ty.span(),
+        "Expected something like `Result<T, E>`, got {ty:?}",
+    );
+    let Type::Path(TypePath { path, .. }) = ty else {
+        panic!("{ty:?}");
+    };
+    // Grab the final segment, e.g. "Result<...>" of "std::result::Result<...>"
+    let Some(seg) = path.segments.last() else {
+        panic!("{e}");
+    };
+    // Are there angle‐bracketed args?
+    let PathArguments::AngleBracketed(ref args) = seg.arguments else {
+        panic!("{e}");
+    };
+    // Take the first of whatever is inside "<...>"
+    let GenericArgument::Type(inner_ty) = &args.args[0] else {
+        panic!("{e}");
+    };
+    inner_ty.clone()
+}
+
 /// Given a function signature with output of the form `Result<T, E>`, return the inner `T` as a `Type`.
 pub(super) fn output(sig: &Signature, i: usize) -> Type {
     let return_ty = &sig.output;

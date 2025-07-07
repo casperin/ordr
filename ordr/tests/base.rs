@@ -1,8 +1,9 @@
 use std::{collections::HashMap, time::Duration};
 
 use ordr::{
-    Context, Error, NodeBuilder, new_job, producer, run_job,
+    Context, Error, Job, NodeBuilder, producer, run_job,
     serde::{Deserialize, Serialize},
+    serde_json,
 };
 use tokio::sync::mpsc::channel;
 
@@ -12,7 +13,7 @@ struct State;
 #[derive(Clone, Serialize, Deserialize)]
 struct A(u8);
 
-#[producer(output=A, state=State)]
+#[producer]
 async fn make_a(_ctx: Context<State>) -> Result<A, Error> {
     Ok(A(1))
 }
@@ -20,7 +21,7 @@ async fn make_a(_ctx: Context<State>) -> Result<A, Error> {
 #[derive(Clone, Serialize, Deserialize)]
 struct B(u8);
 
-#[producer(name="BB", output=B, state=State)]
+#[producer(name = "BB")]
 async fn make_b(_ctx: Context<State>, a: A) -> Result<B, Error> {
     Ok(B(a.0 + 1))
 }
@@ -36,49 +37,60 @@ async fn aaa_producer() {
     // Call A
     let node = A::node();
     let data = (node.producer)(ctx.clone(), vec![]).await.unwrap();
-    let A(n): A = ordr::serde_cbor::from_slice(&data).unwrap();
+    let A(n): A = serde_json::from_value(data.clone()).unwrap();
     assert_eq!(node.name, "A");
     assert_eq!(n, 1);
 
     // Call B (with output of A)
     let node = B::node();
-    let data = (node.producer)(ctx, vec![data]).await.unwrap();
-    let B(n): B = ordr::serde_cbor::from_slice(&data).unwrap();
+    let data = (node.producer)(ctx, vec![data.clone()]).await.unwrap();
+    let B(n): B = serde_json::from_value(data).unwrap();
     assert_eq!(node.name, "BB");
     assert_eq!(n, 2);
 }
 
 #[test]
 fn aaa_job() {
-    let job = new_job!(B).unwrap();
+    let job = Job::builder().add::<B>().build().unwrap();
     assert_eq!(job.len(), 2); // picked up A too
+}
+
+#[test]
+fn aaa_job_with_data() {
+    let v = serde_json::to_value(A(1)).unwrap();
+    let data = [("A".to_string(), v)].into_iter().collect();
+    let job = Job::builder_with_data(data).add::<B>().build().unwrap();
+    assert_eq!(job.len(), 1);
+}
+
+#[test]
+fn aaa_job_with_data_from_str() {
+    let json = r#"{"A": 1}"#;
+    let data = serde_json::from_str(json).unwrap();
+    let job = Job::builder_with_data(data).add::<B>().build().unwrap();
+    assert_eq!(job.len(), 1);
 }
 
 #[tokio::test]
 async fn aaa_run_job() {
-    let job = new_job!(B).unwrap();
+    let job = Job::builder().add::<B>().build().unwrap();
     let state = State;
-    let results = HashMap::new();
     let (tx, mut rx) = channel(2);
-    let job2 = job.clone();
 
-    let handle = tokio::spawn(async move {
-        run_job(job2, state, results, tx).await;
-    });
+    let job_fut = run_job(job.clone(), state, tx);
+    let handle = tokio::spawn(job_fut);
 
-    // Our results
     let mut results = HashMap::new();
     while let Some(msg) = rx.recv().await {
-        if let ordr::Msg::NodeDone(id, _, data) = msg {
-            let name = job.name(&id);
+        if let ordr::Msg::NodeDone(name, _, data) = msg {
             results.insert(name, data);
         }
     }
 
     handle.await.unwrap();
 
-    let A(a): A = ordr::serde_cbor::from_slice(&results["A"]).unwrap();
-    let B(b): B = ordr::serde_cbor::from_slice(&results["BB"]).unwrap();
+    let A(a): A = serde_json::from_value(results.remove("A").unwrap()).unwrap();
+    let B(b): B = serde_json::from_value(results.remove("BB").unwrap()).unwrap();
     assert_eq!(a, 1);
     assert_eq!(b, 2);
 }

@@ -4,7 +4,7 @@ mod input_output;
 use attr::Attr;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{Data, DeriveInput, Error, Ident, ItemFn, Type, parse_macro_input, spanned::Spanned};
+use syn::{Ident, ItemFn, Type, parse_macro_input};
 
 #[proc_macro_attribute]
 pub fn producer(attrs: TokenStream, item: TokenStream) -> TokenStream {
@@ -16,10 +16,14 @@ pub fn producer(attrs: TokenStream, item: TokenStream) -> TokenStream {
     parse_macro_input!(attrs with parser);
 
     let mut dep_tys = input_output::input(&func.sig);
-    let _ctx_ty = dep_tys.remove(0); // First one is the Context argument
+    let context_ty = dep_tys.remove(0); // First one is the Context argument
 
-    let node_ty = attr.out.unwrap(); // TODO
-    let state_ty = attr.state.unwrap(); // TODO
+    let node_ty = attr
+        .out
+        .unwrap_or_else(|| input_output::output(&func.sig, 0));
+    let state_ty = attr
+        .state
+        .unwrap_or_else(|| input_output::first_generic(&context_ty));
 
     let node_name = attr.name.unwrap_or_else(|| ty_to_string(&node_ty));
     let dep_idents: Vec<_> = dep_tys.iter().map(ty_to_ident).collect();
@@ -43,8 +47,7 @@ pub fn producer(attrs: TokenStream, item: TokenStream) -> TokenStream {
                         let [ #(#dep_idents),* ] = payloads.try_into().unwrap();
                         let ( #(#dep_idents),* ) = (
                             #(
-                                ordr::serde_cbor::from_slice(&#dep_idents).unwrap()
-                                // #dep_idents.downcast_ref::<#dep_tys>().unwrap()
+                                ordr::serde_json::from_value(#dep_idents).unwrap()
                             ),*
                         );
 
@@ -54,7 +57,7 @@ pub fn producer(attrs: TokenStream, item: TokenStream) -> TokenStream {
                                 Err(e) => return Err(e),
                             };
 
-                            let v = ordr::serde_cbor::to_vec(&result).unwrap();
+                            let v = ordr::serde_json::to_value(result).unwrap();
                             Ok(v)
                         })
                     })

@@ -1,84 +1,69 @@
-use ordr::{Output, build, error, job::Job, producer};
-
-#[derive(Clone, Debug)]
-struct Error(&'static str);
-
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
+use ordr::{Context, Error, Job, Worker, producer};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
-struct Ctx {
+struct State {
     init: usize,
     fail_b: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 struct A(usize);
 
 #[producer]
-async fn make_a(ctx: Ctx) -> Result<A, Error> {
-    Ok(A(ctx.init + 1))
+async fn make_a(ctx: Context<State>) -> Result<A, Error> {
+    Ok(A(ctx.state.init + 1))
 }
 
 /// Node B and its producer. Depends on A.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 struct B(usize);
 
 #[producer]
-async fn make_b(ctx: Ctx, A(a): A) -> Result<B, Error> {
-    match ctx.fail_b {
-        true => Err(Error("B failed")),
+async fn make_b(ctx: Context<State>, A(a): A) -> Result<B, Error> {
+    match ctx.state.fail_b {
+        true => Err(Error {
+            message: "B failed".into(),
+            retry_in: None,
+        }),
         false => Ok(B(2 + a)),
     }
 }
 
-#[derive(Default, Output)]
-struct MyResults {
-    a: Option<A>,
-    b: Option<B>,
-}
-
 #[tokio::main]
 async fn main() {
-    // tracing_subscriber::fmt().init();
-
-    let graph = build!(A, B).unwrap();
+    tracing_subscriber::fmt().init();
 
     // First execution. It will fail.
-    let job = Job::new().with_target::<B>();
-    let ctx = Ctx {
+    let job = Job::builder().add::<B>().build().unwrap();
+    let state = State {
         init: 1,
         fail_b: true,
     };
 
-    let error = graph.execute(job, ctx).await.unwrap_err();
+    let (data, result) = ordr::Worker::run(job, state).await;
+    let (name, e) = result.unwrap_err();
+    assert_eq!(name, "B");
+    assert_eq!(e, "B failed");
 
-    let error::Error::NodeFailed { outputs, .. } = error else {
-        panic!("Got unexpected error");
-    };
+    let json = serde_json::to_string(&data).unwrap();
+    let json_expected = r#"{"A":2}"#;
+    assert_eq!(json, json_expected);
 
-    let results = MyResults::default().with_output_from(&outputs);
-
-    assert_eq!(results.a, Some(A(2)));
-    assert_eq!(results.b, None);
-
-    // Here we could serialize and store the results,
-    // then later load them up and start again from
-    // where we left off.
-    let job2 = results.into_job().with_target::<B>();
-    let ctx2 = Ctx {
+    // Restart with our json
+    let data = serde_json::from_str(&json).unwrap();
+    let job2 = Job::builder_with_data(data).add::<B>().build().unwrap();
+    let state2 = State {
         init: 10,
         fail_b: false,
     };
 
-    let outputs2 = graph.execute(job2, ctx2).await.unwrap();
-    let results2 = MyResults::default().with_output_from(&outputs2);
+    let (outputs2, result2) = Worker::run(job2, state2).await;
+    result2.unwrap();
 
-    assert_eq!(results2.a, Some(A(2))); // didn't change because it re-used the value
-    assert_eq!(results2.b, Some(B(4))); // this time we got a value
+    let json2 = serde_json::to_string(&outputs2).unwrap();
+    let json2_expected = r#"{"A":2,"B":4}"#;
+    assert_eq!(json2, json2_expected);
 }
 
 /// Ensure that main can run, when running `cargo run --examples`.

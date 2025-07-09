@@ -1,50 +1,49 @@
-use std::{convert::Infallible, time::Duration};
+use ordr::{Context, Error, Job, Worker, producer};
+use serde::{Deserialize, Serialize};
 
-use ordr::{build, job::Job, producer};
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct A;
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct B;
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct C;
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct D;
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct E;
 
 #[producer]
-async fn a(_: ()) -> Result<A, Infallible> {
+async fn a(_: Context<()>) -> Result<A, Error> {
     wait("A", "31", 0).await;
     Ok(A)
 }
 
 #[producer]
-async fn b(_: (), _: A) -> Result<B, Infallible> {
+async fn b(_: Context<()>, _: A) -> Result<B, Error> {
     wait("B", "32", 15).await;
     Ok(B)
 }
 
 #[producer]
-async fn c(_: (), _: A) -> Result<C, Infallible> {
+async fn c(_: Context<()>, _: A) -> Result<C, Error> {
     wait("C", "33", 40).await;
     Ok(C)
 }
 
 #[producer]
-async fn d(_: (), _: B) -> Result<D, Infallible> {
+async fn d(_: Context<()>, _: B) -> Result<D, Error> {
     wait("D", "35", 15).await;
     Ok(D)
 }
 
 #[producer]
-async fn e(_: (), _: C, _: D) -> Result<E, Infallible> {
+async fn e(_: Context<()>, _: C, _: D) -> Result<E, Error> {
     wait("E", "36", 0).await;
     Ok(E)
 }
 
 async fn wait(node: &'static str, color: &'static str, timeout: u64) {
-    let d = Duration::from_millis(5);
+    let d = std::time::Duration::from_millis(5);
     let t = std::time::Instant::now();
     let x = std::time::Duration::from_millis(timeout);
 
@@ -72,8 +71,9 @@ async fn wait(node: &'static str, color: &'static str, timeout: u64) {
 
 #[tokio::main]
 async fn main() {
-    let graph = build!(A, B, C, D, E).unwrap();
-    let job = Job::new().with_target::<E>();
-    println!("{}", graph.mermaid(&job));
-    graph.execute(job, ()).await.unwrap();
+    tracing_subscriber::fmt().init();
+    let job = Job::builder().add::<E>().build().unwrap();
+    // println!("{}", graph.mermaid(&job));
+    let (_data, result) = Worker::run(job, ()).await;
+    result.unwrap();
 }

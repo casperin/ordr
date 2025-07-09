@@ -1,5 +1,6 @@
 use ordr::{Context, Error, Job, Worker, producer};
 use serde::{Deserialize, Serialize};
+use serde_json::Number;
 
 #[derive(Clone)]
 struct State {
@@ -61,9 +62,10 @@ async fn main() {
     let (outputs2, result2) = Worker::run(job2, state2).await;
     result2.unwrap();
 
-    let json2 = serde_json::to_string(&outputs2).unwrap();
-    let json2_expected = r#"{"A":2,"B":4}"#;
-    assert_eq!(json2, json2_expected);
+    let a = outputs2.get("A").unwrap().as_number().unwrap();
+    assert_eq!(*a, Number::from(2));
+    let b = outputs2.get("B").unwrap().as_number().unwrap();
+    assert_eq!(*b, Number::from(4));
 }
 
 /// Ensure that main can run, when running `cargo run --examples`.

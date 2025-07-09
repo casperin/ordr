@@ -9,6 +9,7 @@ use tokio::{
     sync::{OwnedMappedMutexGuard, mpsc::Sender},
     task::{JoinError, JoinSet},
 };
+use tracing::{error, info};
 
 use crate::{Context, Error, Job, State};
 
@@ -32,13 +33,30 @@ impl Worker {
         while let Some(msg) = rx.recv().await {
             // println!("{msg:?}");
             match msg {
-                Msg::Provided(name, v) | Msg::NodeDone(name, _, v) => {
+                Msg::Provided(name, v) => {
                     results.insert(name, v);
                 }
-                Msg::NodeFailed(name, _, error) => {
-                    out = Err((name, error.message));
+                Msg::NodeDone(name, t, v) => {
+                    info!(name, ?t, "Node done");
+                    results.insert(name, v);
                 }
-                _ => {}
+                Msg::NodeStart(name, t) => {
+                    info!(name, ?t, "Node start");
+                }
+                Msg::NodeFailed(name, t, e) => {
+                    let e = e.message;
+                    error!(name, e, ?t, "Node failed");
+                    out = Err((name, e));
+                }
+                Msg::NodeRetrying(name, retry, t) => {
+                    info!(name, retry, ?t, "Node retrying");
+                }
+                Msg::NodePanicked(join_error, t) => {
+                    error!(?join_error, ?t, "Node panicked");
+                }
+                Msg::Done(t) => {
+                    info!(?t, "Job done");
+                }
             };
         }
 

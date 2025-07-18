@@ -1,5 +1,3 @@
-use ordr::Worker;
-
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt().init();
@@ -11,9 +9,12 @@ async fn main() {
         .build()
         .unwrap();
 
+    // let m = ordr::mermaid(&job);
+    // println!("{m}");
+
     let ctx = cells::Ctx::new();
 
-    let mut worker = Worker::new(job, ctx);
+    let mut worker = ordr::Worker::new(job, ctx);
     worker.run().unwrap();
     worker.wait_for_job().await.unwrap();
 }

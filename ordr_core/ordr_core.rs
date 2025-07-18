@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 pub use serde;
 pub use serde_json;
 
@@ -11,3 +9,6 @@ pub use job::*;
 
 mod worker;
 pub use worker::*;
+
+mod mermaid;
+pub use mermaid::*;

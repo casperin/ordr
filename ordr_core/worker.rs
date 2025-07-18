@@ -7,10 +7,9 @@ use std::{
 
 use serde_json::Value;
 use tokio::{
-    sync::{Mutex, OwnedMappedMutexGuard, mpsc::Sender},
-    task::{JoinError, JoinHandle, JoinSet},
+    sync::Mutex,
+    task::{JoinHandle, JoinSet},
 };
-use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 
 use crate::{Context, Error, Job, State};

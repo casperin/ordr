@@ -74,6 +74,7 @@ async fn main() {
     tracing_subscriber::fmt().init();
     let job = Job::builder().add::<E>().build().unwrap();
     // println!("{}", graph.mermaid(&job));
-    let (_data, result) = Worker::run(job, ()).await;
-    result.unwrap();
+    let mut worker = Worker::new(job, ());
+    worker.run().unwrap();
+    worker.wait_for_job().await.unwrap();
 }

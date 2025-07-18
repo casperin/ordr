@@ -38,9 +38,11 @@ async fn main() {
 
     let job = Job::builder().add::<C>().build().unwrap();
 
-    let (data, result) = Worker::run(job, Ctx).await;
-    result.unwrap_err();
+    let mut worker = Worker::new(job, Ctx);
+    worker.run().unwrap();
+    worker.wait_for_job().await.unwrap_err();
 
+    let data = worker.data().await;
     let data = serde_json::to_string(&data).unwrap();
     let data_expected = r#"{"A":1}"#;
 

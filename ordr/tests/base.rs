@@ -1,11 +1,11 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use ordr::{
-    Context, Error, Job, NodeBuilder, producer, run_job,
+    Context, Error, Job, NodeBuilder, NodeState, producer, run_job,
     serde::{Deserialize, Serialize},
     serde_json,
 };
-use tokio::sync::mpsc::channel;
+use tokio::sync::Mutex;
 
 #[derive(Clone, Debug)]
 struct State;
@@ -27,7 +27,7 @@ async fn make_b(_ctx: Context<State>, a: A) -> Result<B, Error> {
 }
 
 #[tokio::test]
-async fn aaa_producer() {
+async fn producer() {
     let ctx = Context {
         state: State,
         retry: 0,
@@ -50,13 +50,13 @@ async fn aaa_producer() {
 }
 
 #[test]
-fn aaa_job() {
+fn job() {
     let job = Job::builder().add::<B>().build().unwrap();
     assert_eq!(job.len(), 2); // picked up A too
 }
 
 #[test]
-fn aaa_job_with_data() {
+fn job_with_data() {
     let v = serde_json::to_value(A(1)).unwrap();
     let data = [("A".to_string(), v)].into_iter().collect();
     let job = Job::builder_with_data(data).add::<B>().build().unwrap();
@@ -64,7 +64,7 @@ fn aaa_job_with_data() {
 }
 
 #[test]
-fn aaa_job_with_data_from_str() {
+fn job_with_data_from_str() {
     let json = r#"{"A": 1}"#;
     let data = serde_json::from_str(json).unwrap();
     let job = Job::builder_with_data(data).add::<B>().build().unwrap();
@@ -72,25 +72,21 @@ fn aaa_job_with_data_from_str() {
 }
 
 #[tokio::test]
-async fn aaa_run_job() {
+async fn runs_jobs() {
     let job = Job::builder().add::<B>().build().unwrap();
     let state = State;
-    let (tx, mut rx) = channel(2);
 
-    let job_fut = run_job(job.clone(), state, tx);
-    let handle = tokio::spawn(job_fut);
+    let out = Arc::new(Mutex::new(HashMap::new()));
+    let job_fut = run_job(job.clone(), state, out.clone());
+    tokio::spawn(job_fut).await.unwrap().unwrap();
 
-    let mut results = HashMap::new();
-    while let Some(msg) = rx.recv().await {
-        if let ordr::Msg::NodeDone(name, _, data) = msg {
-            results.insert(name, data);
+    let mut out = out.lock_owned().await;
+    let state = out.remove("BB").unwrap();
+    match state {
+        NodeState::Done(_, _, value) => {
+            let B(b): B = serde_json::from_value(value).unwrap();
+            assert_eq!(b, 2);
         }
+        _ => panic!("Expeced done state"),
     }
-
-    handle.await.unwrap();
-
-    let A(a): A = serde_json::from_value(results.remove("A").unwrap()).unwrap();
-    let B(b): B = serde_json::from_value(results.remove("BB").unwrap()).unwrap();
-    assert_eq!(a, 1);
-    assert_eq!(b, 2);
 }

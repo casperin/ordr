@@ -1,81 +1,105 @@
 use std::{
     any::TypeId,
     collections::{HashMap, HashSet},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
 use serde_json::Value;
 use tokio::{
-    sync::{OwnedMappedMutexGuard, mpsc::Sender},
-    task::{JoinError, JoinSet},
+    sync::{Mutex, OwnedMappedMutexGuard, mpsc::Sender},
+    task::{JoinError, JoinHandle, JoinSet},
 };
-use tracing::{error, info};
+use tokio_util::sync::CancellationToken;
+use tracing::{error, info, warn};
 
 use crate::{Context, Error, Job, State};
 
-pub struct Worker;
-
-impl Worker {
-    pub async fn run<S: State>(
+enum Mode<S: State> {
+    Init {
         job: Job<S>,
         state: S,
-    ) -> (
-        HashMap<&'static str, Value>,
-        Result<(), (&'static str, String)>,
-    ) {
-        let (tx, mut rx) = tokio::sync::mpsc::channel(job.len());
-        let p = run_job(job, state, tx);
-        tokio::spawn(p);
+    },
+    Starting,
+    Running {
+        handle: JoinHandle<Result<(), String>>,
+    },
+    Done,
+    Stopped,
+}
 
-        let mut results = HashMap::new();
-        let mut out = Ok(());
+pub struct Worker<S: State> {
+    out: Arc<Mutex<HashMap<&'static str, NodeState>>>,
+    mode: Mode<S>,
+}
 
-        while let Some(msg) = rx.recv().await {
-            // println!("{msg:?}");
-            match msg {
-                Msg::Provided(name, v) => {
-                    results.insert(name, v);
-                }
-                Msg::NodeDone(name, t, v) => {
-                    info!(name, ?t, "Node done");
-                    results.insert(name, v);
-                }
-                Msg::NodeStart(name, t) => {
-                    info!(name, ?t, "Node start");
-                }
-                Msg::NodeFailed(name, t, e) => {
-                    let e = e.message;
-                    error!(name, e, ?t, "Node failed");
-                    out = Err((name, e));
-                }
-                Msg::NodeRetrying(name, retry, t) => {
-                    info!(name, retry, ?t, "Node retrying");
-                }
-                Msg::NodePanicked(join_error, t) => {
-                    error!(?join_error, ?t, "Node panicked");
-                }
-                Msg::Done(t) => {
-                    info!(?t, "Job done");
-                }
-            };
+impl<S: State> Worker<S> {
+    pub fn new(job: Job<S>, state: S) -> Self {
+        Self {
+            out: Arc::new(Mutex::new(HashMap::new())),
+            mode: Mode::Init { job, state },
         }
+    }
 
-        (results, out)
+    pub fn run(&mut self) -> Result<(), &'static str> {
+        let Mode::Init { job, state } = std::mem::replace(&mut self.mode, Mode::Starting) else {
+            return Err("Has already been started");
+        };
+        let fut = run_job(job, state, self.out.clone());
+        let handle = tokio::spawn(fut);
+        self.mode = Mode::Running { handle };
+        Ok(())
+    }
+
+    pub fn stop(&mut self) {
+        println!("1");
+        if matches!(&self.mode, Mode::Running { .. }) {
+            println!("2");
+            self.mode = Mode::Stopped;
+        }
+    }
+
+    pub async fn wait_for_job(&mut self) -> Result<(), String> {
+        if matches!(&self.mode, Mode::Init { .. }) {
+            self.run().unwrap();
+        }
+        if !matches!(self.mode, Mode::Running { .. }) {
+            return Ok(());
+        }
+        let Mode::Running { handle } = std::mem::replace(&mut self.mode, Mode::Done) else {
+            unreachable!();
+        };
+        match handle.into_future().await {
+            Ok(result) => result,
+            Err(join_error) => Err(format!("Job panicked: {join_error:?}")),
+        }
+    }
+
+    pub async fn data(&self) -> HashMap<&'static str, Value> {
+        let mut data = HashMap::new();
+        for (&name, state) in self.out.lock().await.iter() {
+            if let NodeState::Provided(value) | NodeState::Done(_, _, value) = state {
+                data.insert(name, value.clone());
+            }
+        }
+        data
     }
 }
 
 #[derive(Debug)]
-pub enum Msg {
-    Provided(&'static str, Value),
-    NodeStart(&'static str, Duration),
-    NodeDone(&'static str, Duration, Value),
-    NodeRetrying(&'static str, u32, Duration),
-    NodeFailed(&'static str, Duration, Error),
-    NodePanicked(JoinError, Duration),
-    Done(Duration),
+pub enum NodeState {
+    Provided(Value),
+    Running(Duration),
+    Done(Duration, u32, Value),
+    Retrying(u32, Duration),
+    Failed(Duration, u32, Error),
 }
 
-pub async fn run_job<S: State>(job: Job<S>, state: S, tx: Sender<Msg>) {
+pub async fn run_job<S: State>(
+    job: Job<S>,
+    state: S,
+    out: Arc<Mutex<HashMap<&'static str, NodeState>>>,
+) -> Result<(), String> {
     // Type for the JoinSet (or running tasks).
     enum Job {
         Done(TypeId, u32, Duration, Result<Value, Error>),
@@ -89,10 +113,13 @@ pub async fn run_job<S: State>(job: Job<S>, state: S, tx: Sender<Msg>) {
     let mut handles = JoinSet::new();
     let mut pending: HashSet<TypeId> = nodes.keys().cloned().collect();
 
+    let mut o = out.lock().await;
     for (id, (name, data)) in job.provided {
-        tx.send(Msg::Provided(name, data.clone())).await;
+        info!(name, "Provided");
+        o.insert(name, NodeState::Provided(data.clone()));
         results.insert(id, data);
     }
+    drop(o);
 
     // A helper to create a Context.
     let ctx = |retry, start| Context {
@@ -114,7 +141,9 @@ pub async fn run_job<S: State>(job: Job<S>, state: S, tx: Sender<Msg>) {
             let producer = node.producer.clone();
             let t1 = t0.elapsed();
             let context = ctx(0, t1);
-            tx.send(Msg::NodeStart(node.name, t1)).await;
+            let state = NodeState::Running(t1);
+            out.lock().await.insert(node.name, state);
+            info!(node = node.name, "Node start");
             handles.spawn(async move {
                 let result = producer(context, payloads).await;
                 Job::Done(id, 0, t0.elapsed(), result)
@@ -123,39 +152,52 @@ pub async fn run_job<S: State>(job: Job<S>, state: S, tx: Sender<Msg>) {
 
         let result = handles.join_next().await;
         let Some(result) = result else {
-            tx.send(Msg::Done(t0.elapsed())).await;
-            return;
+            info!("Job done");
+            return Ok(());
         };
         let result = match result {
             Ok(result) => result,
             Err(e) => {
-                tx.send(Msg::NodePanicked(e, t0.elapsed())).await;
-                return;
+                error!("Node panicked");
+                return Err(format!("Node panicked: {e:?}"));
             }
         };
         match result {
-            Job::Done(id, _retry, time, Ok(payload)) => {
+            Job::Done(id, retry, time, Ok(payload)) => {
                 results.insert(id, payload.clone());
-                tx.send(Msg::NodeDone(nodes[&id].name, time, payload)).await;
+                let name = nodes[&id].name;
+                let state = NodeState::Done(time, retry, payload);
+                out.lock().await.insert(name, state);
+                info!(name, "Node done");
             }
             Job::Done(id, retry, time, Err(e)) => match e.retry_in {
                 Some(retry_in) => {
+                    let name = nodes[&id].name;
+                    warn!(name, retry, ?retry_in, "Node failed");
                     handles.spawn(async move {
                         tokio::time::sleep(time + retry_in).await;
-                        Job::Retry(id, retry + 1)
+                        Job::Retry(id, retry)
                     });
                 }
                 None => {
-                    tx.send(Msg::NodeFailed(nodes[&id].name, time, e)).await;
-                    return;
+                    let name = nodes[&id].name;
+                    let msg = format!("Node {name} failed ({retry} retries): {}", e.message);
+                    let state = NodeState::Failed(time, retry, e);
+                    out.lock().await.insert(name, state);
+                    error!(name, "Node failed");
+                    return Err(msg);
                 }
             },
-            Job::Retry(id, retry) => {
+            Job::Retry(id, mut retry) => {
+                retry += 1;
                 let payloads = get_payloads(id);
                 let producer = nodes[&id].producer.clone();
                 let t = t0.elapsed();
                 let context = ctx(retry, t);
-                tx.send(Msg::NodeRetrying(nodes[&id].name, retry, t)).await;
+                let name = nodes[&id].name;
+                let state = NodeState::Retrying(retry, t);
+                out.lock().await.insert(name, state);
+                info!(retry, "Node retrying");
                 handles.spawn(async move {
                     let result = producer(context, payloads).await;
                     Job::Done(id, retry, t0.elapsed(), result)

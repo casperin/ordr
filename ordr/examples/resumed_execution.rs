@@ -33,8 +33,6 @@ async fn make_b(ctx: Context<State>, A(a): A) -> Result<B, Error> {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt().init();
-
     // First execution. It will fail.
     let job = Job::builder().add::<B>().build().unwrap();
     let state = State {
@@ -42,10 +40,11 @@ async fn main() {
         fail_b: true,
     };
 
-    let (data, result) = ordr::Worker::run(job, state).await;
-    let (name, e) = result.unwrap_err();
-    assert_eq!(name, "B");
-    assert_eq!(e, "B failed");
+    let mut worker = Worker::new(job, state);
+    worker.run().unwrap();
+    let e = worker.wait_for_job().await.unwrap_err();
+    assert!(e.contains("B failed"));
+    let data = worker.data().await;
 
     let json = serde_json::to_string(&data).unwrap();
     let json_expected = r#"{"A":2}"#;
@@ -59,12 +58,14 @@ async fn main() {
         fail_b: false,
     };
 
-    let (outputs2, result2) = Worker::run(job2, state2).await;
-    result2.unwrap();
+    let mut worker = Worker::new(job2, state2);
+    worker.run().unwrap();
+    worker.wait_for_job().await.unwrap();
+    let data = worker.data().await;
 
-    let a = outputs2.get("A").unwrap().as_number().unwrap();
+    let a = data.get("A").unwrap().as_number().unwrap();
     assert_eq!(*a, Number::from(2));
-    let b = outputs2.get("B").unwrap().as_number().unwrap();
+    let b = data.get("B").unwrap().as_number().unwrap();
     assert_eq!(*b, Number::from(4));
 }
 

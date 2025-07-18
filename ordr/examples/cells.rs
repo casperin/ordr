@@ -1,3 +1,5 @@
+use ordr::Worker;
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt().init();
@@ -11,13 +13,9 @@ async fn main() {
 
     let ctx = cells::Ctx::new();
 
-    let (tx, mut rx) = tokio::sync::mpsc::channel(10000);
-    let p = ordr::run_job(job.clone(), ctx, tx);
-    tokio::spawn(p);
-
-    while let Some(msg) = rx.recv().await {
-        tracing::info!(?msg, "Msg");
-    }
+    let mut worker = Worker::new(job, ctx);
+    worker.run().unwrap();
+    worker.wait_for_job().await.unwrap();
 }
 
 mod cells {

@@ -52,8 +52,10 @@ async fn main() {
     let ctx = Ctx;
 
     // Execute the job
-    let (data, result) = Worker::run(job, ctx).await;
-    result.unwrap();
+    let mut job = Worker::new(job, ctx);
+    job.run().unwrap();
+    job.wait_for_job().await.unwrap();
+    let data = job.data().await;
 
     // Get the D out of the outputs
     let data = serde_json::to_value(data).unwrap();

@@ -90,3 +90,51 @@ async fn runs_jobs() {
         _ => panic!("Expeced done state"),
     }
 }
+
+/// Tests that two jobs actually are started concurrently
+#[tokio::test]
+async fn concurrent() {
+    #[derive(Clone)]
+    struct Hist {
+        history: Arc<Mutex<Vec<&'static str>>>,
+    }
+    #[derive(Clone, Serialize, Deserialize)]
+    struct A;
+    #[derive(Clone, Serialize, Deserialize)]
+    struct B;
+    #[derive(Clone, Serialize, Deserialize)]
+    struct C;
+
+    #[producer]
+    async fn a(ctx: Context<Hist>) -> Result<A, Error> {
+        ctx.state.history.lock().await.push("start");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        ctx.state.history.lock().await.push("end");
+        Ok(A)
+    }
+    #[producer]
+    async fn b(ctx: Context<Hist>) -> Result<B, Error> {
+        ctx.state.history.lock().await.push("start");
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        ctx.state.history.lock().await.push("end");
+        Ok(B)
+    }
+    #[producer]
+    async fn c(_ctx: Context<Hist>, _: A, _: B) -> Result<C, Error> {
+        Ok(C)
+    }
+
+    let job = Job::builder().add::<C>().build().unwrap();
+    let history = Arc::new(Mutex::new(Vec::new()));
+    let hist = Hist {
+        history: history.clone(),
+    };
+    let mut worker = ordr::Worker::new(job, hist);
+    worker.run().unwrap();
+    worker.wait_for_job().await.unwrap();
+    let hist = history.lock().await;
+    assert_eq!(hist[0], "start");
+    assert_eq!(hist[1], "start");
+    assert_eq!(hist[2], "end");
+    assert_eq!(hist[3], "end");
+}

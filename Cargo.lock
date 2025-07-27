@@ -267,8 +267,8 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "futures",
- "ordr_core",
- "ordr_macros",
+ "ordr_core 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ordr_macros 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand",
  "serde",
  "serde_json",
@@ -291,14 +291,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "ordr_core"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10ec60cbac91a1e2721d28d79c5f36d2a7ce923d51e2efd8d1d5b6bc77448ad4"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "ordr_macros"
 version = "0.2.0"
 dependencies = [
- "ordr_core",
+ "ordr_core 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "proc-macro2",
  "quote",
  "syn",
  "trybuild",
+]
+
+[[package]]
+name = "ordr_macros"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "732c80b87033565ed78a52c511b3709d9d45f5fe6e0db434ade9f7ba0e912202"
+dependencies = [
+ "ordr_core 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "quote",
+ "syn",
 ]
 
 [[package]]

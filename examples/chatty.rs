@@ -75,7 +75,7 @@ async fn main() {
     let job = Job::builder().add::<E>().build().unwrap();
     // println!("{}", ordr::mermaid(&job));
     let mut worker = Worker::new(job, ());
-    worker.run().unwrap();
-    let output = worker.get_output().await;
+    worker.run().await.unwrap();
+    let output = worker.get_output().await.unwrap();
     assert!(output.is_done());
 }

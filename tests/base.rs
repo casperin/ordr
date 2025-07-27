@@ -1,11 +1,7 @@
-use std::{
-    collections::HashMap,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{sync::Arc, time::Duration};
 
 use ordr::{
-    Context, Error, Job, NodeBuilder, NodeState, Worker, producer, run_job,
+    Context, Error, Job, NodeBuilder, Result, Worker, producer,
     serde::{Deserialize, Serialize},
     serde_json,
 };
@@ -18,7 +14,7 @@ struct State;
 struct A(u8);
 
 #[producer]
-async fn make_a(_ctx: Context<State>) -> Result<A, Error> {
+async fn make_a(_ctx: Context<State>) -> Result<A> {
     Ok(A(1))
 }
 
@@ -26,7 +22,7 @@ async fn make_a(_ctx: Context<State>) -> Result<A, Error> {
 struct B(u8);
 
 #[producer(name = "BB")]
-async fn make_b(_ctx: Context<State>, a: A) -> Result<B, Error> {
+async fn make_b(_ctx: Context<State>, a: A) -> Result<B> {
     Ok(B(a.0 + 1))
 }
 
@@ -75,27 +71,6 @@ fn create_job_with_data_from_str() {
     assert_eq!(job.len(), 1);
 }
 
-#[tokio::test]
-async fn runs_jobs() {
-    let job = Job::builder().add::<B>().build().unwrap();
-    let state = State;
-
-    let out = Arc::new(Mutex::new(HashMap::new()));
-    let t0 = Instant::now();
-    let job_fut = run_job(job.clone(), state, out.clone(), t0);
-    tokio::spawn(job_fut).await.unwrap();
-
-    let mut out = out.lock_owned().await;
-    let state = out.remove("BB").unwrap();
-    match state {
-        NodeState::Done(_, _, value) => {
-            let B(b): B = serde_json::from_value(value).unwrap();
-            assert_eq!(b, 2);
-        }
-        _ => panic!("Expeced done state"),
-    }
-}
-
 /// Tests that two jobs actually are started concurrently
 #[tokio::test]
 async fn concurrent() {
@@ -111,21 +86,21 @@ async fn concurrent() {
     struct C;
 
     #[producer]
-    async fn a(ctx: Context<Hist>) -> Result<A, Error> {
+    async fn a(ctx: Context<Hist>) -> Result<A> {
         ctx.state.history.lock().await.push("start");
         tokio::time::sleep(Duration::from_millis(20)).await;
         ctx.state.history.lock().await.push("end");
         Ok(A)
     }
     #[producer]
-    async fn b(ctx: Context<Hist>) -> Result<B, Error> {
+    async fn b(ctx: Context<Hist>) -> Result<B> {
         ctx.state.history.lock().await.push("start");
         tokio::time::sleep(Duration::from_millis(20)).await;
         ctx.state.history.lock().await.push("end");
         Ok(B)
     }
     #[producer]
-    async fn c(_ctx: Context<Hist>, _: A, _: B) -> Result<C, Error> {
+    async fn c(_ctx: Context<Hist>, _: A, _: B) -> Result<C> {
         Ok(C)
     }
 
@@ -135,8 +110,8 @@ async fn concurrent() {
         history: history.clone(),
     };
     let mut worker = ordr::Worker::new(job, hist);
-    worker.run().unwrap();
-    let output = worker.get_output().await;
+    worker.run().await.unwrap();
+    let output = worker.get_output().await.unwrap();
     assert!(output.is_done());
     let hist = history.lock().await;
     assert_eq!(hist[0], "start");
@@ -151,7 +126,7 @@ async fn output_with_generic() {
     struct A<T>(T);
 
     #[ordr::producer]
-    async fn a(_: ordr::Context<()>) -> Result<A<u32>, ordr::Error> {
+    async fn a(_: ordr::Context<()>) -> Result<A<u32>> {
         Ok(A(22))
     }
 
@@ -161,14 +136,14 @@ async fn output_with_generic() {
     type Au32 = A<u32>;
 
     #[ordr::producer]
-    async fn b(_: ordr::Context<()>, _a: Au32) -> Result<B, ordr::Error> {
+    async fn b(_: ordr::Context<()>, _a: Au32) -> Result<B> {
         Ok(B)
     }
 
     let job = ordr::Job::builder().add::<B>().build().unwrap();
     let mut worker = ordr::Worker::new(job, ());
-    worker.run().unwrap();
-    let output = worker.get_output().await;
+    worker.run().await.unwrap();
+    let output = worker.get_output().await.unwrap();
     assert!(output.is_done());
     let mut data = worker.data().await;
     let A(n): Au32 = serde_json::from_value(data.remove("A").unwrap()).unwrap();
@@ -182,19 +157,19 @@ async fn node_panic() {
     #[derive(Clone, Serialize, Deserialize)]
     struct B;
     #[ordr::producer]
-    async fn a(_: ordr::Context<()>) -> Result<A, ordr::Error> {
+    async fn a(_: ordr::Context<()>) -> Result<A> {
         Ok(A)
     }
     #[ordr::producer(name = "Bomb")]
-    async fn b(_: ordr::Context<()>, _: A) -> Result<B, ordr::Error> {
+    async fn b(_: ordr::Context<()>, _: A) -> Result<B> {
         panic!("boom!")
     }
 
     let job = ordr::Job::builder().add::<B>().build().unwrap();
     let mut worker = ordr::Worker::new(job, ());
-    worker.run().unwrap();
-    match worker.get_output().await {
-        ordr::Output::NodePanic(_, name, _) => assert_eq!(name, "Bomb"),
+    worker.run().await.unwrap();
+    match worker.get_output().await.unwrap() {
+        ordr::Output::NodePanic { name, .. } => assert_eq!(name, "Bomb"),
         output => panic!("Expected node panic, got {output:?}"),
     }
 }
@@ -211,7 +186,7 @@ async fn readme_example() {
     struct A(i32);
 
     #[producer]
-    async fn a(_ctx: Context<Ctx>) -> Result<A, Error> {
+    async fn a(_ctx: Context<Ctx>) -> Result<A> {
         // Do some actual work
         Ok(A(123))
     }
@@ -220,7 +195,7 @@ async fn readme_example() {
     struct B(i32);
 
     #[producer]
-    async fn make_b(_ctx: Context<Ctx>, a: A) -> Result<B, Error> {
+    async fn make_b(_ctx: Context<Ctx>, a: A) -> Result<B> {
         Ok(B(a.0 + 2))
     }
     let job = ordr::Job::builder()
@@ -235,11 +210,11 @@ async fn readme_example() {
     let mut worker = ordr::Worker::new(job, ctx);
 
     // Start the worker.
-    worker.run().unwrap();
+    worker.run().await.unwrap();
 
     // And get the output once it's done. The output is an enum that you can inspect. It will tell you
     // if a node failed or if the whole job was cancelled, etc.
-    let output = worker.get_output().await;
+    let output = worker.get_output().await.unwrap();
 
     assert!(output.is_done());
 
@@ -259,7 +234,7 @@ async fn retrying() {
     struct A(u32);
 
     #[producer]
-    async fn a(ctx: Context<()>) -> Result<A, Error> {
+    async fn a(ctx: Context<()>) -> Result<A> {
         if ctx.retry < 3 {
             let msg = format!("Boom {}", ctx.retry);
             let retry_in = Duration::from_millis(10);
@@ -270,10 +245,39 @@ async fn retrying() {
 
     let job = Job::builder().add::<A>().build().unwrap();
     let mut worker = Worker::new(job, ());
-    worker.run().unwrap();
-    let output = worker.get_output().await;
+    worker.run().await.unwrap();
+    let output = worker.get_output().await.unwrap();
     assert!(output.is_done());
     let v = worker.data().await.remove("A").unwrap();
     let a = serde_json::from_value::<A>(v).unwrap();
     assert_eq!(a.0, 3);
+}
+
+#[tokio::test]
+async fn can_stop() {
+    #[derive(Clone, Serialize, Deserialize)]
+    struct A(u8);
+    #[derive(Clone, Serialize, Deserialize)]
+    struct B(u8);
+    #[producer]
+    async fn a(_: Context<()>) -> Result<A> {
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        Ok(A(1))
+    }
+    #[producer]
+    async fn b(_: Context<()>, _: A) -> Result<B> {
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        Ok(B(1))
+    }
+
+    let job = Job::builder().add::<B>().build().unwrap();
+    let mut worker = Worker::new(job, ());
+    worker.run().await.unwrap();
+    tokio::time::sleep(Duration::from_millis(20)).await;
+    worker.stop().await;
+    let output = worker.get_output().await.unwrap();
+    assert!(output.is_stopped());
+    let data = worker.data().await;
+    assert!(data.contains_key("A"));
+    assert!(!data.contains_key("B"));
 }

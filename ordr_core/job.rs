@@ -1,6 +1,8 @@
+use ::std::hash::BuildHasher;
 use std::{
     any::TypeId,
     collections::{HashMap, HashSet, hash_map::Entry},
+    fmt,
 };
 
 use serde_json::Value;
@@ -8,6 +10,8 @@ use tracing::warn;
 
 use crate::{Node, NodeBuilder, State};
 
+/// Describes what needs to be done, and how to do it. Pass it to a [`crate::Worker`] to have it
+/// executed.
 #[derive(Debug, Clone)]
 pub struct Job<S: State> {
     pub(crate) nodes: HashMap<TypeId, Node<S>>,
@@ -26,6 +30,7 @@ impl<S: State> Default for Job<S> {
 }
 
 impl<S: State> Job<S> {
+    #[must_use]
     pub fn builder() -> JobBuilder<S> {
         JobBuilder {
             data: HashMap::new(),
@@ -33,6 +38,7 @@ impl<S: State> Job<S> {
         }
     }
 
+    #[must_use]
     pub fn builder_with_data(data: HashMap<String, Value>) -> JobBuilder<S> {
         JobBuilder {
             data,
@@ -41,20 +47,24 @@ impl<S: State> Job<S> {
     }
 
     /// Returns the number of nodes in this [`Job<S>`].
+    #[must_use]
     pub fn len(&self) -> usize {
         self.nodes.len()
     }
 
     /// Returns `true` if this [`Job<S>`] contains no nodes.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
     }
 
+    #[must_use]
     pub fn name(&self, id: &TypeId) -> &'static str {
         self.nodes[id].name
     }
 }
 
+/// Builds a job. Created with [`Job::builder()`]. Call `.build()` on it to create a [`Job`].
 pub struct JobBuilder<S: State> {
     data: HashMap<String, Value>,
     job: Job<S>,
@@ -62,6 +72,7 @@ pub struct JobBuilder<S: State> {
 
 impl<S: State> JobBuilder<S> {
     /// Adds a node to the job. All dependencies of the node will be automatically added as well.
+    #[must_use]
     pub fn add<N: NodeBuilder<S>>(mut self) -> Self {
         // Use a stack to recursively add dependencies.
         let mut stack = vec![N::node()];
@@ -89,18 +100,21 @@ impl<S: State> JobBuilder<S> {
     }
 
     /// Creates and validates the Job.
-    pub fn build(self) -> Result<Job<S>, String> {
+    ///
+    /// # Errors
+    /// If the graph contains any cycles, or if there is a name collision.
+    pub fn build(self) -> Result<Job<S>, JobError> {
         for name in self.data.keys() {
             warn!("Did not find {name} from the provided data. Discarding.");
         }
         if let Some(cycle) = find_cycle(&self.job.adj) {
             let names: Vec<_> = cycle.iter().map(|id| self.job.nodes[id].name).collect();
-            return Err(format!("Cycle found: {}", names.join(" -> ")));
+            return Err(JobError::Cycle(names));
         }
         let mut seen = HashSet::new();
         for node in self.job.nodes.values() {
             if seen.contains(node.name) {
-                return Err(format!("Found two nodes with the same name: {}", node.name));
+                return Err(JobError::DuplicateName(node.name));
             }
             seen.insert(node.name);
         }
@@ -108,7 +122,27 @@ impl<S: State> JobBuilder<S> {
     }
 }
 
-pub fn find_cycle(adj: &HashMap<TypeId, Vec<TypeId>>) -> Option<Vec<TypeId>> {
+#[derive(Debug)]
+pub enum JobError {
+    Cycle(Vec<&'static str>),
+    DuplicateName(&'static str),
+}
+
+impl fmt::Display for JobError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            JobError::Cycle(names) => write!(f, "Cycle found: {}", names.join(" -> ")),
+            JobError::DuplicateName(name) => {
+                write!(f, "Found two nodes with the same name: {name}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for JobError {}
+
+#[must_use]
+fn find_cycle<S: BuildHasher>(adj: &HashMap<TypeId, Vec<TypeId>, S>) -> Option<Vec<TypeId>> {
     // Keep track of the nodes: None = not seen, Some(false) = visiting, Some(true) = done.
     let mut state = HashMap::new();
     // Used to build the path if we find a cycle.
@@ -198,18 +232,18 @@ mod tests {
 
     #[test]
     fn can_find_cycle() {
-        let a = TypeId::of::<u16>();
-        let b = TypeId::of::<u32>();
-        let c = TypeId::of::<u64>();
-        let d = TypeId::of::<i64>();
-        let e = TypeId::of::<i64>();
-        let f = TypeId::of::<i64>();
+        let node_a = TypeId::of::<u16>();
+        let node_b = TypeId::of::<u32>();
+        let node_c = TypeId::of::<u64>();
+        let node_d = TypeId::of::<i64>();
+        let node_e = TypeId::of::<i64>();
+        let node_f = TypeId::of::<i64>();
         let mut adj = HashMap::new();
-        adj.insert(a, vec![b, c, f]);
-        adj.insert(b, vec![d]);
-        adj.insert(c, vec![e]);
-        adj.insert(d, vec![e]);
-        adj.insert(e, vec![b]);
+        adj.insert(node_a, vec![node_b, node_c, node_f]);
+        adj.insert(node_b, vec![node_d]);
+        adj.insert(node_c, vec![node_e]);
+        adj.insert(node_d, vec![node_e]);
+        adj.insert(node_e, vec![node_b]);
         let result = find_cycle(&adj);
         assert!(result.is_some());
     }

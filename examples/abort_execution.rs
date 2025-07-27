@@ -36,8 +36,8 @@ async fn main() {
     let job = Job::builder().add::<C>().build().unwrap();
 
     let mut worker = Worker::new(job, Ctx);
-    worker.run().unwrap();
-    let output = worker.get_output().await;
+    worker.run().await.unwrap();
+    let output = worker.get_output().await.unwrap();
     assert!(output.is_node_failed());
 
     let data = worker.data().await;

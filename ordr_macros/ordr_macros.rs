@@ -6,6 +6,11 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{Ident, ItemFn, ReturnType, Type, parse_macro_input, spanned::Spanned};
 
+/// Mark a function return a `Result<T, ordr::Error>` as a producer of `T`.
+///
+/// # Panics
+/// There are several more or less implicit rules that the function (and output) needs to abide by.
+/// If any of them are violated, we panic with a hopefully good error message.
 #[proc_macro_attribute]
 pub fn producer(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let func = parse_macro_input!(item as ItemFn);

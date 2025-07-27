@@ -38,9 +38,9 @@ async fn main() {
     };
 
     let mut worker = Worker::new(job, state);
-    worker.run().unwrap();
-    let output = worker.get_output().await;
-    assert!(matches!(output, Output::NodeFailed(_, "B", _)));
+    worker.run().await.unwrap();
+    let output = worker.get_output().await.unwrap();
+    assert!(matches!(output, Output::NodeFailed { name: "B", .. }));
     let data = worker.data().await;
 
     let json = serde_json::to_string(&data).unwrap();
@@ -56,8 +56,8 @@ async fn main() {
     };
 
     let mut worker = Worker::new(job2, state2);
-    worker.run().unwrap();
-    let output = worker.get_output().await;
+    worker.run().await.unwrap();
+    let output = worker.get_output().await.unwrap();
     assert!(output.is_done());
     let data = worker.data().await;
 

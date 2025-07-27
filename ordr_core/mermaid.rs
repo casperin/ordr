@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::{Job, State};
 
 /// Builds a simple mermaid diagram of the nodes that will be executed when running this job.
+#[must_use]
 pub fn mermaid<S: State>(job: &Job<S>) -> String {
     let idx: HashMap<_, _> = job.adj.keys().enumerate().map(|(i, id)| (*id, i)).collect();
     let n = |id| format!("n{}", idx[id]);

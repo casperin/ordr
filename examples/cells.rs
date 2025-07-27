@@ -15,8 +15,8 @@ async fn main() {
     let ctx = cells::Ctx::new();
 
     let mut worker = ordr::Worker::new(job, ctx);
-    worker.run().unwrap();
-    let output = worker.get_output().await;
+    worker.run().await.unwrap();
+    let output = worker.get_output().await.unwrap();
     assert!(output.is_done());
 }
 

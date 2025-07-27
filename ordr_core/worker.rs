@@ -20,81 +20,131 @@ enum Mode<S: State> {
     Done(Output),
 }
 
+/// Runs [`crate::Job`]s.
+#[derive(Clone)]
 pub struct Worker<S: State> {
     out: Arc<Mutex<HashMap<&'static str, NodeState>>>,
-    mode: Option<Mode<S>>, // Option because of ownership fun
+    mode: Arc<Mutex<Option<Mode<S>>>>, // Option because of ownership fun
 }
 
 impl<S: State> Worker<S> {
+    /// Create a new worker.
     pub fn new(job: Job<S>, state: S) -> Self {
         Self {
             out: Arc::new(Mutex::new(HashMap::new())),
-            mode: Some(Mode::Init { job, state }),
+            mode: Arc::new(Mutex::new(Some(Mode::Init { job, state }))),
         }
     }
 
-    pub fn run(&mut self) -> Result<(), &'static str> {
-        let Mode::Init { job, state } = std::mem::take(&mut self.mode).unwrap() else {
+    /// Start running the job.
+    ///
+    /// # Errors
+    /// If the worker has already started working.
+    #[allow(clippy::missing_panics_doc)]
+    pub async fn run(&mut self) -> Result<(), &'static str> {
+        let mut mode = self.mode.lock().await;
+        let Mode::Init { job, state } = std::mem::take(&mut *mode).unwrap() else {
             return Err("Has already been started");
         };
         let t0 = Instant::now();
         let fut = run_job(job, state, self.out.clone(), t0);
         let handle = tokio::spawn(fut);
-        self.mode = Some(Mode::Running(t0, handle));
+        *mode = Some(Mode::Running(t0, handle));
         Ok(())
     }
 
-    pub fn stop(&mut self) {
-        let Mode::Running(t0, _) = self.mode.as_ref().unwrap() else {
+    /// Stop the worker. All currently running nodes will be aborted.
+    #[allow(clippy::missing_panics_doc)]
+    pub async fn stop(&mut self) {
+        let mut mode = self.mode.lock().await;
+        let Mode::Running(t0, _) = mode.as_ref().unwrap() else {
             return;
         };
-        let t = t0.elapsed();
-        self.mode = Some(Mode::Done(Output::Stopped(t)));
+        let duration = t0.elapsed();
+        *mode = Some(Mode::Done(Output::Stopped { duration }));
     }
 
-    pub async fn get_output(&mut self) -> Output {
-        match self.mode.as_ref().unwrap() {
+    /// Wait for the worker to finish and return the [`Output`].
+    ///
+    /// # Errors
+    /// If the worker is not yet running.
+    #[allow(clippy::missing_panics_doc)]
+    pub async fn get_output(&mut self) -> Result<Output, &'static str> {
+        let mut mode = self.mode.lock().await;
+        match mode.as_ref().unwrap() {
             // If we are done and have an output, then we just return that.
-            Mode::Done(output) => return output.clone(),
+            Mode::Done(output) => return Ok(output.clone()),
             // If we haven't started, then we start and continue below.
-            Mode::Init { .. } => self.run().unwrap(),
+            Mode::Init { .. } => return Err("Not running"),
             // We need to take the handle, so we continue below.
             Mode::Running(_, _) => {}
         }
         // We know we are running, so we take the handle and wait for it.
-        let Mode::Running(_, handle) = std::mem::take(&mut self.mode).unwrap() else {
+        let Mode::Running(_, handle) = std::mem::take(&mut *mode).unwrap() else {
             unreachable!();
         };
 
         let output = handle.await.expect("run_job should not be able to panic");
-        self.mode = Some(Mode::Done(output.clone()));
-        output
+        *mode = Some(Mode::Done(output.clone()));
+        Ok(output)
     }
 
-    pub async fn data(&self) -> HashMap<&'static str, Value> {
+    /// Return the data collected from running the job.
+    pub async fn data(&self) -> HashMap<String, Value> {
         let mut data = HashMap::new();
         for (&name, state) in self.out.lock().await.iter() {
-            if let NodeState::Provided(value) | NodeState::Done(_, _, value) = state {
-                data.insert(name, value.clone());
+            if let NodeState::Provided { value } | NodeState::Done { value, .. } = state {
+                data.insert(name.to_string(), value.clone());
             }
         }
         data
     }
+
+    pub async fn status(&self) -> HashMap<&'static str, NodeState> {
+        self.out.lock().await.clone()
+    }
 }
 
-#[derive(Debug)]
+/// The current state of a single node in a job.
+#[derive(Debug, Clone)]
 pub enum NodeState {
-    Provided(Value),
-    Running(Duration),
-    Done(Duration, u32, Value),
-    Retrying(u32, Duration),
-    Failed(Duration, u32, Error),
+    /// Provided by the user when the job was created.
+    Provided { value: Value },
+    /// Currently being executed.
+    Running {
+        /// The offset from the job start that this node was started.
+        start: Duration,
+    },
+    /// Job has finished successfully.
+    Done {
+        /// Time it took to run this node.
+        duration: Duration,
+        /// Number of retries to finish the node.
+        retries: u32,
+        /// The output of the node.
+        value: Value,
+    },
+    Retrying {
+        /// Current retry start.
+        start: Duration,
+        /// Retry count.
+        retries: u32,
+    },
+    Failed {
+        /// The node failed at this time.
+        duration: Duration,
+        /// Number of retries attempted for this node.
+        retries: u32,
+        /// Error returned from the node.
+        error: Error,
+    },
 }
 
-pub async fn run_job<S: State>(
+#[allow(clippy::too_many_lines)] // It's okay
+async fn run_job<S: State, T: ::std::hash::BuildHasher>(
     job: Job<S>,
     state: S,
-    out: Arc<Mutex<HashMap<&'static str, NodeState>>>,
+    out: Arc<Mutex<HashMap<&'static str, NodeState, T>>>,
     t0: Instant,
 ) -> Output {
     // Type for the JoinSet (or running tasks).
@@ -108,12 +158,17 @@ pub async fn run_job<S: State>(
     let mut results = HashMap::new();
     let mut handles = JoinSet::new();
     let mut abort_handles = HashMap::new();
-    let mut pending: HashSet<TypeId> = nodes.keys().cloned().collect();
+    let mut pending: HashSet<TypeId> = nodes.keys().copied().collect();
 
     let mut o = out.lock().await;
     for (id, (name, data)) in job.provided {
         info!(name, "Provided");
-        o.insert(name, NodeState::Provided(data.clone()));
+        o.insert(
+            name,
+            NodeState::Provided {
+                value: data.clone(),
+            },
+        );
         results.insert(id, data);
     }
     drop(o);
@@ -136,11 +191,11 @@ pub async fn run_job<S: State>(
             let payloads = get_payloads(id);
             let node = &nodes[&id];
             let producer = node.producer.clone();
-            let t1 = t0.elapsed();
-            let context = ctx(0, t1);
-            let state = NodeState::Running(t1);
+            let start = t0.elapsed();
+            let context = ctx(0, start);
+            let state = NodeState::Running { start };
             out.lock().await.insert(node.name, state);
-            info!(node = node.name, "Node start");
+            info!(name = node.name, "Node start");
             let abort_handle = handles.spawn(async move {
                 let result = producer(context, payloads).await;
                 Node::Done(id, 0, t0.elapsed(), result)
@@ -152,53 +207,70 @@ pub async fn run_job<S: State>(
         let Some(result) = result else {
             let duration = t0.elapsed();
             info!(?duration, "Job done");
-            return Output::Done(duration);
+            return Output::Done { duration };
         };
         let result = match result {
             Ok(result) => result,
             Err(e) => {
-                let t = t0.elapsed();
+                let duration = t0.elapsed();
                 let id = abort_handles[&e.id()];
                 let name = nodes[&id].name;
                 error!(name, "Node panicked");
-                return Output::NodePanic(t, name, format!("{e:?}"));
+                return Output::NodePanic {
+                    duration,
+                    name,
+                    error: format!("{e:?}"),
+                };
             }
         };
         match result {
             Node::Done(id, retry, time, Ok(payload)) => {
                 results.insert(id, payload.clone());
                 let name = nodes[&id].name;
-                let state = NodeState::Done(time, retry, payload);
+                let state = NodeState::Done {
+                    duration: time,
+                    retries: retry,
+                    value: payload,
+                };
                 out.lock().await.insert(name, state);
                 info!(name, "Node done");
             }
-            Node::Done(id, retry, time, Err(e)) => match e.retry_in {
-                Some(retry_in) => {
-                    let name = nodes[&id].name;
+            Node::Done(id, retry, time, Err(e)) => {
+                let name = nodes[&id].name;
+                if let Some(retry_in) = e.retry_in {
                     warn!(name, retry, error = e.message, ?retry_in, "Node failed");
                     handles.spawn(async move {
                         tokio::time::sleep(time + retry_in).await;
                         Node::Retry(id, retry)
                     });
-                }
-                None => {
-                    let t = t0.elapsed();
-                    let name = nodes[&id].name;
+                } else {
+                    let duration = t0.elapsed();
                     let msg = format!("Node {name} failed ({retry} retries): {}", e.message);
-                    let state = NodeState::Failed(time, retry, e);
+                    let state = NodeState::Failed {
+                        duration: time,
+                        retries: retry,
+                        error: e,
+                    };
                     out.lock().await.insert(name, state);
                     error!(name, "Node failed");
-                    return Output::NodeFailed(t, name, msg);
+                    return Output::NodeFailed {
+                        duration,
+                        name,
+                        error: msg,
+                    };
                 }
-            },
+            }
             Node::Retry(id, mut retry) => {
                 retry += 1;
                 let payloads = get_payloads(id);
                 let producer = nodes[&id].producer.clone();
-                let t = t0.elapsed();
-                let context = ctx(retry, t);
+                let start = t0.elapsed();
+                let context = ctx(retry, start);
                 let name = nodes[&id].name;
-                let state = NodeState::Retrying(retry, t);
+                let state = NodeState::Retrying {
+                    start,
+                    retries: retry,
+                };
                 out.lock().await.insert(name, state);
                 info!(name, retry, "Node retrying");
                 handles.spawn(async move {

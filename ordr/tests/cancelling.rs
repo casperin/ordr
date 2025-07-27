@@ -38,7 +38,8 @@ async fn can_stop() {
     worker.run().unwrap();
     tokio::time::sleep(Duration::from_millis(20)).await;
     worker.stop();
-    worker.wait_for_job().await.unwrap();
+    let output = worker.get_output().await;
+    assert!(output.is_stopped());
     let data = worker.data().await;
     assert!(data.contains_key("A"));
     assert!(!data.contains_key("B"));

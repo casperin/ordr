@@ -1,4 +1,4 @@
-use ordr::{Context, Error, Job, Worker, producer};
+use ordr::{Context, Error, Job, Output, Worker, producer};
 use serde::{Deserialize, Serialize};
 use serde_json::Number;
 
@@ -23,10 +23,7 @@ struct B(usize);
 #[producer]
 async fn make_b(ctx: Context<State>, A(a): A) -> Result<B, Error> {
     match ctx.state.fail_b {
-        true => Err(Error {
-            message: "B failed".into(),
-            retry_in: None,
-        }),
+        true => Err(Error::fatal("B failed")),
         false => Ok(B(2 + a)),
     }
 }
@@ -42,8 +39,8 @@ async fn main() {
 
     let mut worker = Worker::new(job, state);
     worker.run().unwrap();
-    let e = worker.wait_for_job().await.unwrap_err();
-    assert!(e.contains("B failed"));
+    let output = worker.get_output().await;
+    assert!(matches!(output, Output::NodeFailed(_, "B", _)));
     let data = worker.data().await;
 
     let json = serde_json::to_string(&data).unwrap();
@@ -60,7 +57,8 @@ async fn main() {
 
     let mut worker = Worker::new(job2, state2);
     worker.run().unwrap();
-    worker.wait_for_job().await.unwrap();
+    let output = worker.get_output().await;
+    assert!(output.is_done());
     let data = worker.data().await;
 
     let a = data.get("A").unwrap().as_number().unwrap();

@@ -18,10 +18,7 @@ struct B(usize);
 
 #[producer]
 async fn make_b(_ctx: Context<Ctx>, _a: A) -> Result<B, Error> {
-    Err(Error {
-        message: "B failed".into(),
-        retry_in: None,
-    })
+    Err(Error::fatal("B failed"))
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -40,7 +37,8 @@ async fn main() {
 
     let mut worker = Worker::new(job, Ctx);
     worker.run().unwrap();
-    worker.wait_for_job().await.unwrap_err();
+    let output = worker.get_output().await;
+    assert!(output.is_node_failed());
 
     let data = worker.data().await;
     let data = serde_json::to_string(&data).unwrap();

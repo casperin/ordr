@@ -54,7 +54,7 @@ async fn main() {
     // Execute the job
     let mut job = Worker::new(job, ctx);
     job.run().unwrap();
-    job.wait_for_job().await.unwrap();
+    job.get_output().await;
     let data = job.data().await;
 
     // Get the D out of the outputs

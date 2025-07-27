@@ -4,7 +4,7 @@ mod input_output;
 use attr::Attr;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{Ident, ItemFn, Type, parse_macro_input};
+use syn::{Ident, ItemFn, ReturnType, Type, parse_macro_input, spanned::Spanned};
 
 #[proc_macro_attribute]
 pub fn producer(attrs: TokenStream, item: TokenStream) -> TokenStream {
@@ -18,15 +18,37 @@ pub fn producer(attrs: TokenStream, item: TokenStream) -> TokenStream {
     let mut dep_tys = input_output::input(&func.sig);
     let context_ty = dep_tys.remove(0); // First one is the Context argument
 
-    let node_ty = attr
-        .out
-        .unwrap_or_else(|| input_output::output(&func.sig, 0));
+    let node_ty = match (attr.out, &func.sig.output) {
+        (Some(ty), _) => ty,
+        (None, ReturnType::Default) => panic!("The producer function must return a Result<T>"),
+        (None, ReturnType::Type(_, box_ty)) => input_output::first_generic(box_ty),
+    };
+
     let state_ty = attr
         .state
         .unwrap_or_else(|| input_output::first_generic(&context_ty));
 
     let node_name = attr.name.unwrap_or_else(|| ty_to_string(&node_ty));
-    let dep_idents: Vec<_> = dep_tys.iter().map(ty_to_ident).collect();
+
+    let mut dep_idents = vec![];
+    for ty in &dep_tys {
+        let Type::Path(type_path) = ty else {
+            panic!("{ty:?} has no path")
+        };
+        for seg in &type_path.path.segments {
+            if !seg.arguments.is_empty() {
+                let e = syn::Error::new(
+                    type_path.span(),
+                    "Arguments to producer functions cannot take generics. Use a type alias instead.",
+                );
+                panic!("{e}");
+            }
+        }
+        let seg = type_path.path.segments.last().unwrap();
+        let str = seg.ident.to_string().to_lowercase();
+        let ident = Ident::new(&str, seg.ident.span());
+        dep_idents.push(ident);
+    }
 
     quote! {
         #func
@@ -50,13 +72,11 @@ pub fn producer(attrs: TokenStream, item: TokenStream) -> TokenStream {
                                 ordr::serde_json::from_value(#dep_idents).unwrap()
                             ),*
                         );
-
                         Box::pin(async move {
                             let result = match #func_ident(context, #(#dep_idents),* ).await {
                                 Ok(result) => result,
                                 Err(e) => return Err(e),
                             };
-
                             let v = ordr::serde_json::to_value(result).unwrap();
                             Ok(v)
                         })
@@ -73,14 +93,4 @@ fn ty_to_string(ty: &Type) -> String {
         panic!("{ty:?} has no path")
     };
     type_path.path.segments.last().unwrap().ident.to_string()
-}
-
-/// Turn a type into an ident, like `Foo::Bar` -> `bar`
-fn ty_to_ident(ty: &Type) -> Ident {
-    let Type::Path(type_path) = ty else {
-        panic!("{ty:?} has no path")
-    };
-    let seg = type_path.path.segments.last().unwrap();
-    let str = seg.ident.to_string().to_lowercase();
-    Ident::new(&str, seg.ident.span())
 }

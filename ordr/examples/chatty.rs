@@ -61,7 +61,7 @@ async fn wait(node: &'static str, color: &'static str, timeout: u64) {
 
 // This is the graph. B + D is faster than C.
 //
-//  .A
+//   A
 //  / \
 // B   C
 // |   |
@@ -73,8 +73,9 @@ async fn wait(node: &'static str, color: &'static str, timeout: u64) {
 async fn main() {
     tracing_subscriber::fmt().init();
     let job = Job::builder().add::<E>().build().unwrap();
-    // println!("{}", graph.mermaid(&job));
+    // println!("{}", ordr::mermaid(&job));
     let mut worker = Worker::new(job, ());
     worker.run().unwrap();
-    worker.wait_for_job().await.unwrap();
+    let output = worker.get_output().await;
+    assert!(output.is_done());
 }

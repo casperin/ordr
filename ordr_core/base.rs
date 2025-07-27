@@ -41,6 +41,52 @@ pub struct Context<S: State> {
 
 #[derive(Debug)]
 pub struct Error {
-    pub message: String,
-    pub retry_in: Option<Duration>,
+    pub(crate) message: String,
+    pub(crate) retry_in: Option<Duration>,
+}
+
+impl Error {
+    pub fn fatal(message: impl Into<String>) -> Self {
+        let message = message.into();
+        let retry_in = None;
+        Self { message, retry_in }
+    }
+
+    pub fn with_retry(message: impl Into<String>, retry_in: Duration) -> Self {
+        let message = message.into();
+        let retry_in = Some(retry_in);
+        Self { message, retry_in }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Output {
+    Done(Duration),
+    NodeFailed(Duration, &'static str, String),
+    NodePanic(Duration, &'static str, String),
+    Stopped(Duration),
+}
+
+impl Output {
+    /// Returns the total duration of running the job.
+    pub fn duration(&self) -> Duration {
+        match self {
+            Output::Done(duration) => *duration,
+            Output::NodeFailed(duration, _, _) => *duration,
+            Output::NodePanic(duration, _, _) => *duration,
+            Output::Stopped(duration) => *duration,
+        }
+    }
+    pub fn is_done(&self) -> bool {
+        matches!(self, Self::Done(..))
+    }
+    pub fn is_stopped(&self) -> bool {
+        matches!(self, Self::Stopped(..))
+    }
+    pub fn is_node_failed(&self) -> bool {
+        matches!(self, Self::NodeFailed(..))
+    }
+    pub fn is_node_panic(&self) -> bool {
+        matches!(self, Self::NodePanic(..))
+    }
 }
